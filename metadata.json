@@ -1,0 +1,5 @@
+{
+  "name": "Sistema de Ventas Pro",
+  "description": "Sistema integral de gestión de ventas e inventario con control de acceso por roles (Admin/Vendedor).",
+  "requestFramePermissions": []
+}
