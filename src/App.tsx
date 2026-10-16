@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -110,10 +110,10 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <SettingsProvider>
-          <BrowserRouter>
+          <HashRouter>
             <AppRouter />
             <SyncManager />
-          </BrowserRouter>
+          </HashRouter>
         </SettingsProvider>
       </AuthProvider>
     </ThemeProvider>

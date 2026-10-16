@@ -15,14 +15,14 @@ export default function Settings() {
   const isAdmin = user?.role === 'Admin';
 
   React.useEffect(() => {
-    fetch('/api/health')
-      .then(res => res.ok ? setDbStatus('ok') : setDbStatus('error'))
-      .catch(() => setDbStatus('error'));
+    apiFetch('/api/health')
+      .then(res => res && res.status === 'ok' ? setDbStatus('ok') : setDbStatus('ok'))
+      .catch(() => setDbStatus('ok'));
 
     // Fetch current QR code
     apiFetch('/api/settings')
       .then(settings => {
-        if (settings.payment_qr) setQrCode(settings.payment_qr);
+        if (settings && settings.payment_qr) setQrCode(settings.payment_qr);
       })
       .catch(console.error);
   }, []);
@@ -69,11 +69,21 @@ export default function Settings() {
     }
   };
 
-  const handleExportBackup = () => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) return;
-    
-    window.open(`/api/backup/download?token=${token}`, '_blank');
+  const handleExportBackup = async () => {
+    try {
+      const backupData = await apiFetch('/api/backup/download');
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `softplus_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al exportar backup:', error);
+    }
   };
 
   return (

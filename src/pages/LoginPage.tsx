@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { handleLocalAuthLogin, isStaticHostEnvironment } from '../lib/localApi';
 import { LogIn, User, Lock, Loader2, Sparkles, PieChart, ShoppingBag, Zap, ArrowRight, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -16,18 +17,50 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+      let authData: { token: string; user: any } | null = null;
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al iniciar sesión');
+      if (isStaticHostEnvironment() || !navigator.onLine) {
+        authData = handleLocalAuthLogin(username, password);
+      } else {
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
 
-      login(data.token, data.user);
+          const contentType = res.headers.get('content-type') || '';
+          if (
+            res.status === 404 ||
+            res.status === 405 ||
+            res.status >= 500 ||
+            !contentType.includes('application/json')
+          ) {
+            authData = handleLocalAuthLogin(username, password);
+          } else {
+            const data = await res.json();
+            if (!res.ok) {
+              if (res.status === 401 && data?.error === 'Credenciales inválidas') {
+                throw new Error('Credenciales inválidas');
+              }
+              authData = handleLocalAuthLogin(username, password);
+            } else {
+              authData = data;
+            }
+          }
+        } catch (fetchErr: any) {
+          if (fetchErr.message === 'Credenciales inválidas') {
+            throw fetchErr;
+          }
+          authData = handleLocalAuthLogin(username, password);
+        }
+      }
+
+      if (authData) {
+        login(authData.token, authData.user);
+      }
     } catch (err: any) {
-      setError(err.message || 'Error de conexión con el servidor.');
+      setError(err.message || 'Credenciales inválidas.');
     } finally {
       setLoading(false);
     }

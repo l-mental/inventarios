@@ -23,30 +23,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const savedUser = localStorage.getItem('user');
 
       if (savedToken && savedUser) {
+        if (savedToken.startsWith('local-jwt-')) {
+          try {
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
+          } catch {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+          setIsLoading(false);
+          return;
+        }
+
         try {
-          console.log('[Auth] Verifying stored token...');
           const res = await fetch('/api/auth/me', {
             headers: { 'Authorization': `Bearer ${savedToken}` }
           });
 
-          if (res.ok) {
-            const data = await res.json();
-            console.log('[Auth] Token verified successfully:', data.user.username);
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && contentType.includes('application/json')) {
+            await res.json();
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
+          } else if (!contentType.includes('application/json')) {
+            // Static / Vercel environment fallback: keep existing session
             setToken(savedToken);
             setUser(JSON.parse(savedUser));
           } else {
-            console.warn('[Auth] Token verification failed, clearing session');
-            // Token expired or invalid
             localStorage.removeItem('token');
             localStorage.removeItem('user');
           }
         } catch (error) {
-          console.error('[Auth] Error during token verification:', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          // Offline or static fallback: preserve stored user session
+          try {
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
+          } catch {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
         }
-      } else {
-        console.log('[Auth] No stored token found');
       }
       setIsLoading(false);
     };
