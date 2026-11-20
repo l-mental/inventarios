@@ -11,9 +11,10 @@ import {
   CashMovement,
   Quotation,
   Expense,
+  BranchTransfer,
 } from '../types';
 
-const STORAGE_KEY = 'softplus_cloud_store_v2';
+const STORAGE_KEY = 'calaminas_pro_store_v3';
 
 export interface LocalStore {
   users: (User & { password_plain?: string })[];
@@ -23,6 +24,7 @@ export interface LocalStore {
   purchases: Purchase[];
   inventory_movements: InventoryMovement[];
   sales: Sale[];
+  branch_transfers: BranchTransfer[];
   cash_sessions: CashSession[];
   cash_movements: CashMovement[];
   quotations: Quotation[];
@@ -43,39 +45,297 @@ export interface LocalStore {
 }
 
 const DEFAULT_PRODUCTS: (Product & { active?: number })[] = [
-  { id: 1, name: 'Paracetamol 500mg (Caja x20)', description: 'Analgésico y antipirético para el alivio del dolor y la fiebre', price: 12.50, cost_price: 7.75, stock: 85, category: 'Farmacia', barcode: '777010000001', batch_number: 'LOT-26A100', expiry_date: '2026-10-25', is_combo: 0, active: 1 },
-  { id: 2, name: 'Ibuprofeno 400mg (Caja x10)', description: 'Antiinflamatorio no esteroideo para dolores musculares', price: 15.00, cost_price: 9.30, stock: 60, category: 'Farmacia', barcode: '777010000002', batch_number: 'LOT-26B101', expiry_date: '2026-11-15', is_combo: 0, active: 1 },
-  { id: 3, name: 'Amoxicilina 500mg (Caja x12)', description: 'Antibiótico de amplio espectro bacteriano', price: 28.00, cost_price: 17.36, stock: 42, category: 'Farmacia', barcode: '777010000003', batch_number: 'LOT-26C102', expiry_date: '2027-03-20', is_combo: 0, active: 1 },
-  { id: 4, name: 'Alcohol en Gel 500ml', description: 'Desinfectante antibacteriano con glicerina hidratante', price: 18.00, cost_price: 11.16, stock: 95, category: 'Higiene', barcode: '777010000004', batch_number: 'LOT-26D103', expiry_date: '2027-06-30', is_combo: 0, active: 1 },
-  { id: 5, name: 'Mascarillas Quirúrgicas (Caja x50)', description: 'Protección respiratoria de triple capa termosellada', price: 25.00, cost_price: 15.50, stock: 110, category: 'Protección', barcode: '777010000005', batch_number: 'LOT-26E104', expiry_date: '2027-09-15', is_combo: 0, active: 1 },
-  { id: 6, name: 'Suero Oral Rehidratante (Sobre)', description: 'Electrolitos para prevención de la deshidratación', price: 6.50, cost_price: 4.03, stock: 150, category: 'Farmacia', barcode: '777010000006', batch_number: 'LOT-26F105', expiry_date: '2026-11-02', is_combo: 0, active: 1 },
-  { id: 7, name: 'Gasas Estériles (Pack x10)', description: 'Material de curación y apósito estéril para heridas', price: 8.00, cost_price: 4.96, stock: 75, category: 'Material Médico', barcode: '777010000007', batch_number: 'LOT-26A106', expiry_date: '2027-12-31', is_combo: 0, active: 1 },
-  { id: 8, name: 'Termómetro Digital Infrarrojo', description: 'Medición rápida de temperatura corporal sin contacto', price: 85.00, cost_price: 52.70, stock: 18, category: 'Equipos', barcode: '777010000008', batch_number: 'LOT-26B107', expiry_date: '2028-05-10', is_combo: 0, active: 1 },
-  { id: 9, name: 'Vitamina C 1000mg Efervescente', description: 'Refuerzo inmunológico en tabletas efervescentes x10', price: 22.00, cost_price: 13.64, stock: 64, category: 'Suplementos', barcode: '777010000009', batch_number: 'LOT-26C108', expiry_date: '2026-10-25', is_combo: 0, active: 1 },
-  { id: 10, name: 'Jarabe para la Tos Infantil 120ml', description: 'Alivio eficaz de la tos seca y productiva para niños', price: 32.50, cost_price: 20.15, stock: 30, category: 'Farmacia', barcode: '777010000010', batch_number: 'LOT-26D109', expiry_date: '2026-11-15', is_combo: 0, active: 1 },
-  { id: 11, name: 'Protector Solar FPS 50+ 200ml', description: 'Alta protección dermatológica contra rayos UVA y UVB', price: 65.00, cost_price: 40.30, stock: 24, category: 'Cuidado Personal', barcode: '777010000011', batch_number: 'LOT-26E110', expiry_date: '2027-03-20', is_combo: 0, active: 1 },
-  { id: 12, name: 'Algodón Hidrófilo 200g', description: 'Puro algodón blanco absorbente para uso médico y cosmético', price: 11.00, cost_price: 6.82, stock: 80, category: 'Higiene', barcode: '777010000012', batch_number: 'LOT-26F111', expiry_date: '2027-06-30', is_combo: 0, active: 1 },
-  { id: 13, name: 'Tiras Reactivas Glucosa (x50)', description: 'Tiras para glucómetro de monitoreo de glucosa en sangre', price: 95.00, cost_price: 58.90, stock: 15, category: 'Diagnóstico', barcode: '777010000013', batch_number: 'LOT-26A112', expiry_date: '2027-09-15', is_combo: 0, active: 1 },
-  { id: 14, name: 'Tensiómetro Digital de Brazo', description: 'Medidor de presión arterial automático con pantalla LCD', price: 140.00, cost_price: 86.80, stock: 12, category: 'Equipos', barcode: '777010000014', batch_number: 'LOT-26B113', expiry_date: '2026-11-02', is_combo: 0, active: 1 },
-  { id: 15, name: 'Crema Cicatrizante Antibacteriana', description: 'Pomada antiséptica para heridas leves y quemaduras', price: 24.00, cost_price: 14.88, stock: 45, category: 'Dermatología', barcode: '777010000015', batch_number: 'LOT-26C114', expiry_date: '2027-12-31', is_combo: 0, active: 1 },
   {
-    id: 16,
-    name: 'Pack Botiquín Familiar Bioseguridad',
-    description: 'Combo promocional: Paracetamol + Alcohol en Gel + Mascarillas Quirúrgicas',
+    id: 1,
+    name: 'Calamina Ondulada Zinc Galvanizada 0.35mm',
+    description: 'Lámina de acero galvanizado por inmersión en caliente, perfil ondulado tradicional resistente a granizo y corrosión.',
+    price: 28.50,
+    cost_price: 19.20,
+    stock: 600,
+    min_stock: 0,
+    branch_stocks: { 'Sucursal Central': 500, 'Sucursal Norte': 100 },
+    category: 'Calamina Ondulada',
+    barcode: 'CAL-ZNC-035',
+    batch_number: 'BOB-26Z01',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+    design_type: 'Ondulada Sinusoidal',
+    color_name: 'Zinc Galvanizado',
+    color_hex: '#94a3b8',
+    thickness: '0.35 mm',
+    width_m: 0.80,
+    standard_length_m: 3.00,
+    unit_type: 'm',
+  },
+  {
+    id: 2,
+    name: 'Calamina Tipo Teja Colonial Rojo Teja 0.40mm',
+    description: 'Acero prepintado estampado tipo teja española clásica con recubrimiento UV de alta durabilidad térmica.',
     price: 48.00,
-    cost_price: 29.50,
-    stock: 25,
-    category: 'Promociones',
-    barcode: '777999000111',
-    batch_number: 'PACK-2026-01',
-    expiry_date: '2027-08-30',
+    cost_price: 31.50,
+    stock: 420,
+    min_stock: 40,
+    branch_stocks: { 'Sucursal Central': 300, 'Sucursal Norte': 120 },
+    category: 'Calamina Teja Colonial',
+    barcode: 'CAL-TEJ-040',
+    batch_number: 'BOB-26R02',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
+    design_type: 'Teja Colonial Española',
+    color_name: 'Rojo Teja',
+    color_hex: '#b91c1c',
+    thickness: '0.40 mm',
+    width_m: 1.00,
+    standard_length_m: 3.60,
+    unit_type: 'm',
+  },
+  {
+    id: 3,
+    name: 'Calamina Trapezoidal TR4 Azul Rey 0.40mm',
+    description: 'Perfil trapezoidal estructural de 4 crestas para naves industriales, tinglados y cubiertas de gran luz.',
+    price: 42.00,
+    cost_price: 27.80,
+    stock: 380,
+    min_stock: 30,
+    branch_stocks: { 'Sucursal Central': 260, 'Sucursal Norte': 120 },
+    category: 'Calamina Trapezoidal',
+    barcode: 'CAL-TR4-AZ40',
+    batch_number: 'BOB-26A03',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_azul_trapezoidal_1795139680949.jpg',
+    design_type: 'Trapezoidal TR4',
+    color_name: 'Azul Rey',
+    color_hex: '#1d4ed8',
+    thickness: '0.40 mm',
+    width_m: 1.05,
+    standard_length_m: 6.00,
+    unit_type: 'm',
+  },
+  {
+    id: 4,
+    name: 'Calamina Trapezoidal TR4 Verde Bosque 0.40mm',
+    description: 'Chapa trapezoidal prepintada con esmalte poliéster horneado color verde bosque para viviendas y cabañas.',
+    price: 42.00,
+    cost_price: 27.80,
+    stock: 290,
+    min_stock: 25,
+    branch_stocks: { 'Sucursal Central': 200, 'Sucursal Norte': 90 },
+    category: 'Calamina Trapezoidal',
+    barcode: 'CAL-TR4-VR40',
+    batch_number: 'BOB-26V04',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_verde_trapezoidal_1795139681356.jpg',
+    design_type: 'Trapezoidal TR4',
+    color_name: 'Verde Bosque',
+    color_hex: '#15803d',
+    thickness: '0.40 mm',
+    width_m: 1.05,
+    standard_length_m: 4.00,
+    unit_type: 'm',
+  },
+  {
+    id: 5,
+    name: 'Calamina Ondulada Gris Antracita Mate 0.45mm',
+    description: 'Acabado arquitectónico mate oscuro de alta resistencia estructural, ideal para techos modernos y fachadas.',
+    price: 45.50,
+    cost_price: 30.20,
+    stock: 310,
+    min_stock: 20,
+    branch_stocks: { 'Sucursal Central': 220, 'Sucursal Norte': 90 },
+    category: 'Calamina Ondulada',
+    barcode: 'CAL-OND-ANT45',
+    batch_number: 'BOB-26G05',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_antracita_ondulada_1795139681264.jpg',
+    design_type: 'Ondulada Sinusoidal',
+    color_name: 'Gris Antracita',
+    color_hex: '#334155',
+    thickness: '0.45 mm',
+    width_m: 0.85,
+    standard_length_m: 3.60,
+    unit_type: 'm',
+  },
+  {
+    id: 6,
+    name: 'Calamina Translúcida Policarbonato Cristal 0.80mm',
+    description: 'Lámina ondulada translúcida con filtro UV para iluminación natural de galpones, patios y lavanderías.',
+    price: 52.00,
+    cost_price: 33.40,
+    stock: 180,
+    min_stock: 15,
+    branch_stocks: { 'Sucursal Central': 120, 'Sucursal Norte': 60 },
+    category: 'Calamina Translúcida',
+    barcode: 'CAL-POL-080',
+    batch_number: 'BOB-26P06',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_translucida_policarbonato_1795139681734.jpg',
+    design_type: 'Translúcida Policarbonato',
+    color_name: 'Cristal Translúcido',
+    color_hex: '#cbd5e1',
+    thickness: '0.80 mm (PC)',
+    width_m: 0.80,
+    standard_length_m: 3.00,
+    unit_type: 'm',
+  },
+  {
+    id: 7,
+    name: 'Calamina Ondulada Zinc Pesada 0.50mm',
+    description: 'Calamina galvanizada de calibre grueso reforzado para zonas de vientos fuertes y cubiertas comerciales.',
+    price: 39.00,
+    cost_price: 26.50,
+    stock: 250,
+    min_stock: 20,
+    branch_stocks: { 'Sucursal Central': 180, 'Sucursal Norte': 70 },
+    category: 'Calamina Ondulada',
+    barcode: 'CAL-ZNC-050',
+    batch_number: 'BOB-26Z07',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+    design_type: 'Ondulada Sinusoidal',
+    color_name: 'Zinc Galvanizado',
+    color_hex: '#94a3b8',
+    thickness: '0.50 mm',
+    width_m: 0.85,
+    standard_length_m: 3.60,
+    unit_type: 'm',
+  },
+  {
+    id: 8,
+    name: 'Calamina Teja Colonial Rojo Terracota 0.45mm',
+    description: 'Perfil tipo teja de calibre 0.45 mm de alto espesor, terminación satinada antidecoloración.',
+    price: 54.00,
+    cost_price: 36.00,
+    stock: 210,
+    min_stock: 15,
+    branch_stocks: { 'Sucursal Central': 150, 'Sucursal Norte': 60 },
+    category: 'Calamina Teja Colonial',
+    barcode: 'CAL-TEJ-045',
+    batch_number: 'BOB-26R08',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
+    design_type: 'Teja Colonial Española',
+    color_name: 'Rojo Teja',
+    color_hex: '#b91c1c',
+    thickness: '0.45 mm',
+    width_m: 1.00,
+    standard_length_m: 3.60,
+    unit_type: 'm',
+  },
+  {
+    id: 9,
+    name: 'Calamina Trapezoidal TR4 Azul Industrial 0.50mm',
+    description: 'Plancha trapezoidal pesada calibre 0.50 mm prepintada azul rey para tinglados de gran envergadura.',
+    price: 49.50,
+    cost_price: 33.20,
+    stock: 240,
+    min_stock: 0,
+    branch_stocks: { 'Sucursal Central': 160, 'Sucursal Norte': 80 },
+    category: 'Calamina Trapezoidal',
+    barcode: 'CAL-TR4-AZ50',
+    batch_number: 'BOB-26A09',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_azul_trapezoidal_1795139680949.jpg',
+    design_type: 'Trapezoidal TR4',
+    color_name: 'Azul Rey',
+    color_hex: '#1d4ed8',
+    thickness: '0.50 mm',
+    width_m: 1.05,
+    standard_length_m: 6.00,
+    unit_type: 'm',
+  },
+  {
+    id: 10,
+    name: 'Cumbrera Metálica Rojo Teja (Desarrollo 40cm)',
+    description: 'Caballete de remate superior plegado en acero prepintado Rojo Teja, se vende por metro lineal.',
+    price: 24.00,
+    cost_price: 15.00,
+    stock: 120,
+    min_stock: 10,
+    branch_stocks: { 'Sucursal Central': 85, 'Sucursal Norte': 35 },
+    category: 'Cumbreras y Canaletas',
+    barcode: 'ACC-CUM-ROJ',
+    batch_number: 'PLE-26C10',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
+    design_type: 'Cumbrera / Remate',
+    color_name: 'Rojo Teja',
+    color_hex: '#b91c1c',
+    thickness: '0.40 mm',
+    width_m: 0.40,
+    standard_length_m: 2.00,
+    unit_type: 'm',
+  },
+  {
+    id: 11,
+    name: 'Cumbrera Galvanizada Estándar (Desarrollo 40cm)',
+    description: 'Caballete galvanizado plegado para unión de dos aguas en cubiertas metálicas.',
+    price: 18.50,
+    cost_price: 11.40,
+    stock: 160,
+    min_stock: 0,
+    branch_stocks: { 'Sucursal Central': 110, 'Sucursal Norte': 50 },
+    category: 'Cumbreras y Canaletas',
+    barcode: 'ACC-CUM-ZNC',
+    batch_number: 'PLE-26C11',
+    expiry_date: '2030-12-31',
+    is_combo: 0,
+    active: 1,
+    image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+    design_type: 'Cumbrera / Remate',
+    color_name: 'Zinc Galvanizado',
+    color_hex: '#94a3b8',
+    thickness: '0.35 mm',
+    width_m: 0.40,
+    standard_length_m: 2.00,
+    unit_type: 'm',
+  },
+  {
+    id: 12,
+    name: 'Pack Cubierta Mixta (Trapezoidal Verde + Luz Natural)',
+    description: 'Combo de techo por medición: combina plancha Trapezoidal Verde Bosque con tragaluz Policarbonato.',
+    price: 78.00,
+    cost_price: 51.00,
+    stock: 45,
+    min_stock: 0,
+    branch_stocks: { 'Sucursal Central': 30, 'Sucursal Norte': 15 },
+    category: 'Packs de Techo',
+    barcode: 'PCK-TEC-VER',
+    batch_number: 'PCK-26-01',
+    expiry_date: '2030-12-31',
     is_combo: 1,
     combo_items: JSON.stringify([
-      { product_id: 1, quantity: 1 },
       { product_id: 4, quantity: 1 },
-      { product_id: 5, quantity: 1 }
+      { product_id: 6, quantity: 1 }
     ]),
-    active: 1
+    active: 1,
+    image_url: '/src/assets/images/calamina_verde_trapezoidal_1795139681356.jpg',
+    design_type: 'Pack Completo',
+    color_name: 'Verde Bosque',
+    color_hex: '#15803d',
+    thickness: '0.40 mm',
+    width_m: 1.05,
+    standard_length_m: 3.00,
+    unit_type: 'm',
   }
 ];
 
@@ -84,22 +344,22 @@ function createInitialStore(): LocalStore {
   const today = nowIso.split('T')[0];
 
   const users: (User & { password_plain?: string })[] = [
-    { id: 1, username: 'admin', full_name: 'Administrador Sistema', role: 'Admin', role_id: 1, password_plain: 'admin123' },
-    { id: 2, username: 'vendedor', full_name: 'Carlos Vendedor', role: 'Vendedor', role_id: 2, password_plain: 'vendedor123' }
+    { id: 1, username: 'admin', full_name: 'Administrador Planta', role: 'Admin', role_id: 1, password_plain: 'admin123' },
+    { id: 2, username: 'vendedor', full_name: 'Carlos Mendoza (Ventas)', role: 'Vendedor', role_id: 2, password_plain: 'vendedor123' }
   ];
 
   const customers: Customer[] = [
-    { id: 1, name: 'Juan Pérez Morales', email: 'juan.perez@gmail.com', phone: '78945612', address: 'Av. 6 de Agosto #340', points: 120, credit_balance: 0, created_at: nowIso },
-    { id: 2, name: 'María Elena Quispe', email: 'maria.quispe@hotmail.com', phone: '71239845', address: 'Calle Murillo #120', points: 85, credit_balance: 0, created_at: nowIso },
-    { id: 3, name: 'Carlos Mendoza Ruiz', email: 'carlos.mendoza@yahoo.com', phone: '68521479', address: 'Zona Miraflores #55', points: 40, credit_balance: 0, created_at: nowIso },
-    { id: 4, name: 'Ana Lucía Fernández', email: 'ana.fernandez@gmail.com', phone: '74125896', address: 'Av. Arce Edif. Illimani #402', points: 210, credit_balance: 0, created_at: nowIso },
-    { id: 5, name: 'Clínica Santa María', email: 'compras@santamaria.org', phone: '22445566', address: 'Calle México #780', points: 350, credit_balance: 0, created_at: nowIso }
+    { id: 1, name: 'Constructora Horizonte S.R.L.', email: 'compras@horizonte.bo', phone: '78945612', address: 'Av. Cristo Redentor Km 5', points: 180, credit_balance: 0, created_at: nowIso },
+    { id: 2, name: 'Ferretería El Constructor', email: 'pedidos@elconstructor.bo', phone: '71239845', address: 'Av. Mutualista #420', points: 120, credit_balance: 0, created_at: nowIso },
+    { id: 3, name: 'Arq. Roberto Mamani', email: 'rmamani@arqestudio.com', phone: '68521479', address: 'Zona Equipetrol Calle 8', points: 65, credit_balance: 0, created_at: nowIso },
+    { id: 4, name: 'Inmobiliaria Cordillera', email: 'obras@cordillera.bo', phone: '74125896', address: 'Av. Banzer #1200', points: 240, credit_balance: 0, created_at: nowIso },
+    { id: 5, name: 'Juan Carlos Condori', email: 'jc.condori@gmail.com', phone: '77445566', address: 'Plan 3000 Av. Paurito', points: 45, credit_balance: 0, created_at: nowIso }
   ];
 
   const suppliers: Supplier[] = [
-    { id: 1, name: 'Distribuidora FarmaPlus', phone: '77771234', email: 'ventas@farmaplus.bo', address: 'Av. Las Américas #102' },
-    { id: 2, name: 'Laboratorios B4', phone: '76543210', email: 'contacto@laboratoriosb4.com', address: 'Calle Industrial #55' },
-    { id: 3, name: 'LUBRAX & Salud', phone: '74504589', email: 'ventas@lubraxsalud.com', address: 'Zona Central #890' }
+    { id: 1, name: 'Aceros & Bobinas del Sur S.A.', phone: '77771234', email: 'ventas@acerossur.bo', address: 'Parque Industrial PI-14' },
+    { id: 2, name: 'Metalúrgica Altiplano', phone: '76543210', email: 'bobinas@metalaltiplano.com', address: 'Carretera al Norte Km 12' },
+    { id: 3, name: 'Policarbonatos & Techos Latam', phone: '74504589', email: 'importaciones@politech.com', address: 'Zona Franca Industrial' }
   ];
 
   const inventory_movements: InventoryMovement[] = DEFAULT_PRODUCTS.map((p, idx) => ({
@@ -107,10 +367,10 @@ function createInitialStore(): LocalStore {
     product_id: p.id,
     product_name: p.name,
     user_id: 1,
-    user_name: 'Administrador Sistema',
+    user_name: 'Administrador Planta',
     type: 'IN',
     quantity: p.stock,
-    reason: 'Carga inicial de inventario',
+    reason: 'Carga inicial de bobinas (metros lineales)',
     created_at: nowIso
   }));
 
@@ -119,41 +379,50 @@ function createInitialStore(): LocalStore {
       id: 1,
       user_id: 1,
       customer_id: 1,
-      total: 40.00,
+      total: 1728.00,
       status: 'COMPLETED',
       payment_method: 'CASH',
-      cash_amount: 40.00,
+      cash_amount: 1728.00,
       qr_amount: 0,
       credit_amount: 0,
-      paid_amount: 40.00,
+      paid_amount: 1728.00,
       discount_amount: 0,
       points_redeemed: 0,
       created_at: nowIso,
-      seller_name: 'Administrador Sistema',
-      customer_name: 'Juan Pérez Morales',
+      seller_name: 'Administrador Planta',
+      customer_name: 'Constructora Horizonte S.R.L.',
       customer_phone: '78945612',
       details: [
-        { id: 1, sale_id: 1, product_id: 1, product_name: 'Paracetamol 500mg (Caja x20)', quantity: 2, unit_price: 12.50, subtotal: 25.00 },
-        { id: 2, sale_id: 1, product_id: 2, product_name: 'Ibuprofeno 400mg (Caja x10)', quantity: 1, unit_price: 15.00, subtotal: 15.00 }
+        {
+          id: 1,
+          sale_id: 1,
+          product_id: 2,
+          product_name: 'Calamina Tipo Teja Colonial Rojo Teja 0.40mm',
+          quantity: 36,
+          unit_price: 48.00,
+          subtotal: 1728.00,
+          sheet_length_m: 3.60,
+          sheet_count: 10,
+          measurement_summary: '10 planchas × 3.60 m = 36.00 m (36.00 m²)'
+        }
       ]
     }
   ];
 
   const cash_movements: CashMovement[] = [
-    { id: 1, session_id: 1, user_id: 1, user_name: 'Administrador Sistema', type: 'INCOME', amount: 50.00, reason: 'Ingreso de sencillo para cambio', created_at: nowIso },
-    { id: 2, session_id: 1, user_id: 1, user_name: 'Administrador Sistema', type: 'EXPENSE', amount: 25.00, reason: 'Compra de rollos térmicos para impresora', created_at: nowIso }
+    { id: 1, session_id: 1, user_id: 1, user_name: 'Administrador Planta', type: 'INCOME', amount: 100.00, reason: 'Fondo sencillo para corte y despacho', created_at: nowIso }
   ];
 
   const cash_sessions: CashSession[] = [
     {
       id: 1,
       user_id: 1,
-      user_name: 'Administrador Sistema',
+      user_name: 'Administrador Planta',
       opening_amount: 500.00,
-      expected_amount: 565.00,
-      extra_income: 50.00,
-      extra_expense: 25.00,
-      notes: 'Apertura de turno principal',
+      expected_amount: 2328.00,
+      extra_income: 100.00,
+      extra_expense: 0,
+      notes: 'Apertura de turno Planta Central',
       status: 'OPEN',
       opened_at: nowIso,
       movements: cash_movements
@@ -164,36 +433,45 @@ function createInitialStore(): LocalStore {
     {
       id: 1,
       user_id: 1,
-      customer_id: 1,
-      seller_name: 'Administrador Sistema',
-      customer_name: 'Juan Pérez Morales',
-      customer_phone: '78945612',
-      total: 107.50,
-      valid_until: '2026-10-30',
-      notes: 'Cotización corporativa sujeta a disponibilidad',
+      customer_id: 2,
+      seller_name: 'Administrador Planta',
+      customer_name: 'Ferretería El Constructor',
+      customer_phone: '71239845',
+      total: 2520.00,
+      valid_until: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      notes: 'Proforma corte a medida TR4 Azul Rey para tinglado 12x8m',
       status: 'PENDING',
       created_at: nowIso,
       details: [
-        { id: 1, sale_id: 1, product_id: 1, product_name: 'Paracetamol 500mg (Caja x20)', quantity: 5, unit_price: 12.50, subtotal: 62.50 },
-        { id: 2, sale_id: 1, product_id: 2, product_name: 'Ibuprofeno 400mg (Caja x10)', quantity: 3, unit_price: 15.00, subtotal: 45.00 }
+        {
+          id: 1,
+          sale_id: 1,
+          product_id: 3,
+          product_name: 'Calamina Trapezoidal TR4 Azul Rey 0.40mm',
+          quantity: 60,
+          unit_price: 42.00,
+          subtotal: 2520.00,
+          sheet_length_m: 6.00,
+          sheet_count: 10,
+          measurement_summary: '10 planchas × 6.00 m = 60.00 m (63.00 m²)'
+        }
       ]
     }
   ];
 
   const expenses: Expense[] = [
-    { id: 1, user_id: 1, user_name: 'Administrador Sistema', category: 'Alquiler', description: 'Pago mensual de alquiler de local comercial', amount: 1800.00, expense_date: today, payment_method: 'QR', created_at: nowIso },
-    { id: 2, user_id: 1, user_name: 'Administrador Sistema', category: 'Servicios Básicos', description: 'Factura de energía eléctrica y agua potable', amount: 320.50, expense_date: today, payment_method: 'CASH', created_at: nowIso },
-    { id: 3, user_id: 1, user_name: 'Administrador Sistema', category: 'Internet y Sistemas', description: 'Servicio fibra óptica empresarial 300 Mbps', amount: 210.00, expense_date: today, payment_method: 'QR', created_at: nowIso },
-    { id: 4, user_id: 1, user_name: 'Administrador Sistema', category: 'Logística y Transporte', description: 'Transporte de mercadería e insumos de almacén', amount: 145.00, expense_date: today, payment_method: 'CASH', created_at: nowIso }
+    { id: 1, user_id: 1, user_name: 'Administrador Planta', category: 'Alquiler', description: 'Alquiler galpón de corte y almacenamiento Norte', amount: 3200.00, expense_date: today, payment_method: 'QR', created_at: nowIso },
+    { id: 2, user_id: 1, user_name: 'Administrador Planta', category: 'Servicios Básicos', description: 'Energía trifásica para perfiladora y cizalla', amount: 680.00, expense_date: today, payment_method: 'CASH', created_at: nowIso },
+    { id: 3, user_id: 1, user_name: 'Administrador Planta', category: 'Logística y Transporte', description: 'Flete camión grúa entrega de calaminas en obra', amount: 350.00, expense_date: today, payment_method: 'CASH', created_at: nowIso }
   ];
 
   const purchases: Purchase[] = [
-    { id: 1, number: 'FAC-00102', supplier_id: 1, supplier_name: 'Distribuidora FarmaPlus', warehouse: 'Almacén Principal S1', total: 480, status: 'COMPLETED', created_at: nowIso, purchase_date: today },
-    { id: 2, number: 'FAC-00105', supplier_id: 2, supplier_name: 'Laboratorios B4', warehouse: 'Almacén Principal S1', total: 1250, status: 'COMPLETED', created_at: nowIso, purchase_date: today }
+    { id: 1, number: 'BOB-00102', supplier_id: 1, supplier_name: 'Aceros & Bobinas del Sur S.A.', warehouse: 'Sucursal Central', total: 8500, status: 'COMPLETED', created_at: nowIso, purchase_date: today },
+    { id: 2, number: 'BOB-00105', supplier_id: 2, supplier_name: 'Metalúrgica Altiplano', warehouse: 'Sucursal Central', total: 6400, status: 'COMPLETED', created_at: nowIso, purchase_date: today }
   ];
 
   const audit_logs: AuditLog[] = [
-    { id: 1, user_id: 1, user_name: 'Administrador Sistema', action: 'LOGIN', entity: 'USER', entity_id: 1, details: 'Sistema inicializado correctamente', created_at: nowIso }
+    { id: 1, user_id: 1, user_name: 'Administrador Planta', action: 'LOGIN', entity: 'USER', entity_id: 1, details: 'Sistema de calaminas por medición inicializado', created_at: nowIso }
   ];
 
   return {
@@ -204,6 +482,7 @@ function createInitialStore(): LocalStore {
     purchases,
     inventory_movements,
     sales,
+    branch_transfers: [],
     cash_sessions,
     cash_movements,
     quotations,
@@ -211,11 +490,11 @@ function createInitialStore(): LocalStore {
     expenses,
     audit_logs,
     settings: {
-      company_name: 'Softplus',
-      company_nit: '1023456789',
+      company_name: 'AcerTecho Calaminas S.R.L.',
+      company_nit: '1028495021',
       currency: 'Bs',
       phone: '77889900',
-      address: 'Av. Principal #450, Edificio Comercial Softplus',
+      address: 'Parque Industrial Norte Mz. 4, Planta de Laminado y Corte',
       tax_percentage: '13'
     }
   };
@@ -227,6 +506,20 @@ export function getStore(): LocalStore {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.users) && Array.isArray(parsed.products)) {
+        if (!Array.isArray(parsed.branch_transfers)) {
+          parsed.branch_transfers = [];
+        }
+        parsed.products.forEach((p: any) => {
+          if (p.min_stock === undefined) p.min_stock = 0;
+          if (!p.unit_type) p.unit_type = 'm';
+          if (!p.width_m) p.width_m = 0.85;
+          if (!p.branch_stocks) {
+            p.branch_stocks = {
+              'Sucursal Central': Math.max(0, Math.floor(p.stock * 0.7)),
+              'Sucursal Norte': Math.max(0, Math.ceil(p.stock * 0.3))
+            };
+          }
+        });
         return parsed;
       }
     }
@@ -251,7 +544,7 @@ function getCurrentUserFromToken(): User {
     const saved = localStorage.getItem('user');
     if (saved) return JSON.parse(saved);
   } catch {}
-  return { id: 1, username: 'admin', full_name: 'Administrador Sistema', role: 'Admin', role_id: 1 };
+  return { id: 1, username: 'admin', full_name: 'Administrador Planta', role: 'Admin', role_id: 1 };
 }
 
 function logLocalAudit(store: LocalStore, user: User, action: string, entity: string, entityId: number, details: string) {
@@ -324,7 +617,13 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
     const completedSales = store.sales.filter(s => s.status === 'COMPLETED' && (!isSeller || s.user_id === currentUser.id));
     const revenue = completedSales.reduce((sum, s) => sum + Number(s.total || 0), 0);
     const activeProducts = store.products.filter(p => p.active !== 0);
-    const lowStock = activeProducts.filter(p => p.stock < 10).length;
+    const lowStock = activeProducts.filter(p => {
+      const minThreshold = p.min_stock !== undefined ? p.min_stock : 0;
+      if (minThreshold === 0) {
+        return p.stock < 0;
+      }
+      return p.stock <= minThreshold;
+    }).length;
 
     const recentSales = [...completedSales]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -345,6 +644,26 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-7);
 
+    const calcPeriod = (days: number) => {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const matched = completedSales.filter(s => new Date(s.created_at) >= cutoff);
+      const totalRev = matched.reduce((acc, s) => acc + Number(s.total || 0), 0);
+      return {
+        count: matched.length,
+        revenue: totalRev,
+        avgTicket: matched.length > 0 ? totalRev / matched.length : 0
+      };
+    };
+
+    const periodMetrics = {
+      day: calcPeriod(1),
+      week: calcPeriod(7),
+      month: calcPeriod(30),
+      bimonth: calcPeriod(60),
+      quarter: calcPeriod(90),
+      year: calcPeriod(365)
+    };
+
     return {
       revenue,
       salesCount: completedSales.length,
@@ -352,7 +671,8 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
       lowStock,
       customersCount: store.customers.length,
       recentSales,
-      salesByDay
+      salesByDay,
+      periodMetrics
     };
   }
 
@@ -363,20 +683,38 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
   if (path === '/api/products' && method === 'POST') {
     const nextId = store.products.reduce((max, p) => Math.max(max, p.id), 0) + 1;
     const price = Number(body.price || 0);
-    const cost_price = body.cost_price !== undefined ? Number(body.cost_price) : Number((price * 0.6).toFixed(2));
+    const cost_price = body.cost_price !== undefined ? Number(body.cost_price) : Number((price * 0.65).toFixed(2));
+    const stockVal = Number((Number(body.stock ?? 0)).toFixed(2));
+    const minStockVal = body.min_stock !== undefined && body.min_stock !== null && body.min_stock !== ''
+      ? Math.max(0, Number(body.min_stock))
+      : 0;
+
     const newProd: Product & { active?: number } = {
       id: nextId,
       name: body.name,
       description: body.description || '',
       price,
       cost_price,
-      stock: Number(body.stock || 0),
-      category: body.category || 'Otros',
-      barcode: body.barcode || `777010${String(nextId).padStart(6, '0')}`,
-      batch_number: body.batch_number || 'LOT-26-NEW',
-      expiry_date: body.expiry_date || '2027-12-31',
+      stock: stockVal,
+      min_stock: minStockVal,
+      branch_stocks: body.branch_stocks || {
+        'Sucursal Central': stockVal,
+        'Sucursal Norte': 0
+      },
+      category: body.category || 'Calamina Ondulada',
+      barcode: body.barcode || `CAL-${String(nextId).padStart(4, '0')}`,
+      batch_number: body.batch_number || 'BOB-26-NEW',
+      expiry_date: body.expiry_date || '2030-12-31',
       is_combo: body.is_combo ? 1 : 0,
       combo_items: body.combo_items ? (typeof body.combo_items === 'string' ? body.combo_items : JSON.stringify(body.combo_items)) : undefined,
+      image_url: body.image_url || '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+      design_type: body.design_type || 'Ondulada Sinusoidal',
+      color_name: body.color_name || 'Zinc Galvanizado',
+      color_hex: body.color_hex || '#94a3b8',
+      thickness: body.thickness || '0.40 mm',
+      width_m: Number(body.width_m || 0.85),
+      standard_length_m: Number(body.standard_length_m || 3.0),
+      unit_type: body.unit_type || 'm',
       active: 1
     };
     store.products.push(newProd);
@@ -388,10 +726,10 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
       user_name: currentUser.full_name,
       type: 'IN',
       quantity: newProd.stock,
-      reason: 'Stock inicial',
+      reason: 'Stock inicial (metros lineales)',
       created_at: nowIso
     });
-    logLocalAudit(store, currentUser, 'CREATE', 'PRODUCT', nextId, `Producto creado: ${newProd.name}`);
+    logLocalAudit(store, currentUser, 'CREATE', 'PRODUCT', nextId, `Calamina registrada: ${newProd.name}`);
     saveStore(store);
     return { id: nextId };
   }
@@ -400,7 +738,19 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
     const idx = store.products.findIndex(p => p.id === id);
     if (idx !== -1) {
       const oldStock = store.products[idx].stock;
-      const newStock = Number(body.stock ?? oldStock);
+      const newStock = Number((Number(body.stock ?? oldStock)).toFixed(2));
+      const minStockVal = body.min_stock !== undefined && body.min_stock !== null && body.min_stock !== ''
+        ? Math.max(0, Number(body.min_stock))
+        : (store.products[idx].min_stock ?? 0);
+
+      const existingBranches = store.products[idx].branch_stocks || {
+        'Sucursal Central': oldStock,
+        'Sucursal Norte': 0
+      };
+      if (oldStock !== newStock && !body.branch_stocks) {
+        existingBranches['Sucursal Central'] = Math.max(0, Number(((existingBranches['Sucursal Central'] || 0) + (newStock - oldStock)).toFixed(2)));
+      }
+
       store.products[idx] = {
         ...store.products[idx],
         name: body.name ?? store.products[idx].name,
@@ -408,15 +758,25 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
         price: Number(body.price ?? store.products[idx].price),
         cost_price: body.cost_price !== undefined ? Number(body.cost_price) : store.products[idx].cost_price,
         stock: newStock,
+        min_stock: minStockVal,
+        branch_stocks: body.branch_stocks || existingBranches,
         category: body.category ?? store.products[idx].category,
         barcode: body.barcode ?? store.products[idx].barcode,
         batch_number: body.batch_number ?? store.products[idx].batch_number,
         expiry_date: body.expiry_date ?? store.products[idx].expiry_date,
         is_combo: body.is_combo ? 1 : 0,
-        combo_items: body.combo_items ? (typeof body.combo_items === 'string' ? body.combo_items : JSON.stringify(body.combo_items)) : undefined
+        combo_items: body.combo_items ? (typeof body.combo_items === 'string' ? body.combo_items : JSON.stringify(body.combo_items)) : undefined,
+        image_url: body.image_url ?? store.products[idx].image_url,
+        design_type: body.design_type ?? store.products[idx].design_type,
+        color_name: body.color_name ?? store.products[idx].color_name,
+        color_hex: body.color_hex ?? store.products[idx].color_hex,
+        thickness: body.thickness ?? store.products[idx].thickness,
+        width_m: body.width_m !== undefined ? Number(body.width_m) : store.products[idx].width_m,
+        standard_length_m: body.standard_length_m !== undefined ? Number(body.standard_length_m) : store.products[idx].standard_length_m,
+        unit_type: body.unit_type ?? store.products[idx].unit_type
       };
       if (oldStock !== newStock) {
-        const diff = newStock - oldStock;
+        const diff = Number((newStock - oldStock).toFixed(2));
         store.inventory_movements.unshift({
           id: store.inventory_movements.reduce((m, i) => Math.max(m, i.id), 0) + 1,
           product_id: id,
@@ -425,11 +785,11 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
           user_name: currentUser.full_name,
           type: diff > 0 ? 'IN' : 'OUT',
           quantity: Math.abs(diff),
-          reason: 'Ajuste manual',
+          reason: 'Ajuste manual por medición',
           created_at: nowIso
         });
       }
-      logLocalAudit(store, currentUser, 'UPDATE', 'PRODUCT', id, `Producto actualizado: ${store.products[idx].name}`);
+      logLocalAudit(store, currentUser, 'UPDATE', 'PRODUCT', id, `Calamina actualizada: ${store.products[idx].name}`);
       saveStore(store);
     }
     return { success: true };
@@ -438,7 +798,7 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
     const id = Number(path.split('/').pop());
     const prod = store.products.find(p => p.id === id);
     if (prod) prod.active = 0;
-    logLocalAudit(store, currentUser, 'DELETE', 'PRODUCT', id, `Producto desactivado ID: ${id}`);
+    logLocalAudit(store, currentUser, 'DELETE', 'PRODUCT', id, `Calamina desactivada ID: ${id}`);
     saveStore(store);
     return { success: true };
   }
@@ -498,10 +858,25 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
     if (!sale) throw new Error('Venta no encontrada');
     if (sale.status === 'CANCELLED') throw new Error('La venta ya está anulada');
 
+    const reason = body?.reason || 'Anulación solicitada por el usuario';
     sale.status = 'CANCELLED';
+    sale.cancel_reason = reason;
+    sale.cancelled_at = nowIso;
+    sale.cancelled_by = currentUser.full_name;
+
     (sale.details || []).forEach(d => {
       const prod = store.products.find(p => p.id === d.product_id);
-      if (prod) prod.stock += d.quantity;
+      if (prod) {
+        prod.stock = Number((prod.stock + d.quantity).toFixed(2));
+        if (!prod.branch_stocks) {
+          prod.branch_stocks = {
+            'Sucursal Central': prod.stock,
+            'Sucursal Norte': 0
+          };
+        } else {
+          prod.branch_stocks['Sucursal Central'] = Number(((prod.branch_stocks['Sucursal Central'] || 0) + d.quantity).toFixed(2));
+        }
+      }
       store.inventory_movements.unshift({
         id: store.inventory_movements.reduce((m, i) => Math.max(m, i.id), 0) + 1,
         product_id: d.product_id,
@@ -510,7 +885,7 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
         user_name: currentUser.full_name,
         type: 'IN',
         quantity: d.quantity,
-        reason: `Anulación Venta #${saleId}`,
+        reason: `Anulación Factura #${saleId} (${d.measurement_summary || `${d.quantity} m`}): ${reason}`,
         created_at: nowIso
       });
     });
@@ -523,9 +898,81 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
       }
     }
 
-    logLocalAudit(store, currentUser, 'CANCEL', 'SALE', saleId, `Venta anulada ID: ${saleId}`);
+    logLocalAudit(store, currentUser, 'CANCEL', 'SALE', saleId, `Venta anulada ID: ${saleId}. Motivo: ${reason}`);
     saveStore(store);
     return { success: true };
+  }
+
+  // Branch & Transfers Routes
+  if (path === '/api/branches' && method === 'GET') {
+    return [
+      { id: 1, name: 'Sucursal Central', is_main: true },
+      { id: 2, name: 'Sucursal Norte', is_main: false },
+      { id: 3, name: 'Sucursal Sur', is_main: false }
+    ];
+  }
+
+  if (path === '/api/branches/transfers' && method === 'GET') {
+    return store.branch_transfers || [];
+  }
+
+  if (path === '/api/branches/transfer' && method === 'POST') {
+    const { product_id, from_branch, to_branch, quantity, notes } = body;
+    const qty = Number(Number(quantity).toFixed(2));
+    if (!product_id) throw new Error('Debe seleccionar la calamina a transferir.');
+    if (!from_branch || !to_branch) throw new Error('Debe especificar sucursal origen y sucursal destino.');
+    if (from_branch === to_branch) throw new Error('La sucursal de origen y la de destino deben ser diferentes.');
+    if (isNaN(qty) || qty <= 0) throw new Error('La cantidad a transferir debe ser mayor a 0.');
+
+    const prod = store.products.find(p => p.id === Number(product_id));
+    if (!prod) throw new Error('Producto no encontrado en inventario.');
+
+    if (!prod.branch_stocks) {
+      prod.branch_stocks = {
+        'Sucursal Central': Math.floor(prod.stock * 0.7),
+        'Sucursal Norte': Math.ceil(prod.stock * 0.3)
+      };
+    }
+
+    const available = Number(prod.branch_stocks[from_branch] ?? 0);
+    if (available < qty) {
+      throw new Error(`Stock insuficiente en ${from_branch}. Metros disponibles: ${available} m.`);
+    }
+
+    prod.branch_stocks[from_branch] = Number((available - qty).toFixed(2));
+    prod.branch_stocks[to_branch] = Number((Number(prod.branch_stocks[to_branch] ?? 0) + qty).toFixed(2));
+
+    if (!Array.isArray(store.branch_transfers)) store.branch_transfers = [];
+    const transferId = store.branch_transfers.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+    const newTransfer: BranchTransfer = {
+      id: transferId,
+      product_id: prod.id,
+      product_name: prod.name,
+      from_branch,
+      to_branch,
+      quantity: qty,
+      notes: notes || '',
+      user_id: currentUser.id,
+      user_name: currentUser.full_name,
+      created_at: nowIso
+    };
+    store.branch_transfers.unshift(newTransfer);
+
+    store.inventory_movements.unshift({
+      id: store.inventory_movements.reduce((m, i) => Math.max(m, i.id), 0) + 1,
+      product_id: prod.id,
+      product_name: prod.name,
+      user_id: currentUser.id,
+      user_name: currentUser.full_name,
+      type: 'ADJUSTMENT',
+      quantity: qty,
+      reason: `Traspaso entre sucursales: ${qty} m de [${from_branch}] hacia [${to_branch}]${notes ? ` (${notes})` : ''}`,
+      created_at: nowIso
+    });
+
+    logLocalAudit(store, currentUser, 'TRANSFER', 'BRANCH_TRANSFER', transferId, `Traspaso de ${qty} m de ${prod.name} desde ${from_branch} hacia ${to_branch}`);
+    saveStore(store);
+    return { success: true, transfer: newTransfer, updated_stocks: prod.branch_stocks };
   }
   if (path.startsWith('/api/sales/') && method === 'GET') {
     const id = Number(path.split('/').pop());
@@ -563,10 +1010,20 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
 
     const saleDetails = (items || []).map((item: any, idx: number) => {
       const prod = store.products.find(p => p.id === Number(item.id || item.product_id));
-      if (!prod || prod.stock < item.quantity) {
-        throw new Error(`Stock insuficiente para el producto: ${prod?.name || item.id}`);
+      const qtyNum = Number(Number(item.quantity).toFixed(2));
+      if (!prod || prod.stock < qtyNum) {
+        throw new Error(`Stock insuficiente para: ${prod?.name || item.id}. Disponible: ${prod?.stock ?? 0} m.`);
       }
-      prod.stock -= Number(item.quantity);
+      prod.stock = Number((prod.stock - qtyNum).toFixed(2));
+      if (prod.branch_stocks) {
+        const central = Number(prod.branch_stocks['Sucursal Central'] ?? 0);
+        if (central >= qtyNum) {
+          prod.branch_stocks['Sucursal Central'] = Number((central - qtyNum).toFixed(2));
+        } else {
+          prod.branch_stocks['Sucursal Central'] = 0;
+        }
+      }
+      const measureText = item.measurement_summary ? ` (${item.measurement_summary})` : '';
       store.inventory_movements.unshift({
         id: store.inventory_movements.reduce((m, i) => Math.max(m, i.id), 0) + 1,
         product_id: prod.id,
@@ -574,8 +1031,8 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
         user_id: currentUser.id,
         user_name: currentUser.full_name,
         type: 'SALE',
-        quantity: Number(item.quantity),
-        reason: `Venta #${nextSaleId}`,
+        quantity: qtyNum,
+        reason: `Venta #${nextSaleId}${measureText}`,
         created_at: nowIso
       });
 
@@ -584,9 +1041,9 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
           const components = JSON.parse(prod.combo_items) as { product_id: number; quantity: number }[];
           components.forEach(comp => {
             const compProd = store.products.find(p => p.id === comp.product_id);
-            const compQty = comp.quantity * Number(item.quantity);
+            const compQty = Number((comp.quantity * qtyNum).toFixed(2));
             if (compProd && compProd.stock >= compQty) {
-              compProd.stock -= compQty;
+              compProd.stock = Number((compProd.stock - compQty).toFixed(2));
               store.inventory_movements.unshift({
                 id: store.inventory_movements.reduce((m, i) => Math.max(m, i.id), 0) + 1,
                 product_id: compProd.id,
@@ -595,7 +1052,7 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
                 user_name: currentUser.full_name,
                 type: 'SALE',
                 quantity: compQty,
-                reason: `Componente Combo (${prod.name}) - Venta #${nextSaleId}`,
+                reason: `Componente Pack (${prod.name}) - Venta #${nextSaleId}`,
                 created_at: nowIso
               });
             }
@@ -608,9 +1065,12 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
         sale_id: nextSaleId,
         product_id: prod.id,
         product_name: prod.name,
-        quantity: Number(item.quantity),
+        quantity: qtyNum,
         unit_price: Number(item.price),
-        subtotal: Number(item.quantity) * Number(item.price)
+        subtotal: Number((qtyNum * Number(item.price)).toFixed(2)),
+        sheet_length_m: item.sheet_length_m ? Number(item.sheet_length_m) : undefined,
+        sheet_count: item.sheet_count ? Number(item.sheet_count) : undefined,
+        measurement_summary: item.measurement_summary || undefined
       };
     });
 
@@ -1114,71 +1574,93 @@ export function installLocalApiInterceptor() {
   if (typeof window === 'undefined' || interceptorInstalled) return;
   interceptorInstalled = true;
 
-  const originalFetch = window.fetch.bind(window);
+  try {
+    const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
+    if (!originalFetch) return;
 
-  const createJsonResponse = (data: any, status = 200) => {
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  };
+    const createJsonResponse = (data: any, status = 200) => {
+      return new Response(JSON.stringify(data), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
 
-  const executeLocalAsResponse = async (url: string, init?: RequestInit): Promise<Response> => {
-    try {
-      const result = await handleLocalApiRequest(url, init);
-      return createJsonResponse(result, 200);
-    } catch (err: any) {
-      const msg = err?.message || 'Error en la operación';
-      const status = msg === 'Credenciales inválidas' ? 401 : 400;
-      return createJsonResponse({ error: msg }, status);
-    }
-  };
+    const executeLocalAsResponse = async (url: string, init?: RequestInit): Promise<Response> => {
+      try {
+        const result = await handleLocalApiRequest(url, init);
+        return createJsonResponse(result, 200);
+      } catch (err: any) {
+        const msg = err?.message || 'Error en la operación';
+        const status = msg === 'Credenciales inválidas' ? 401 : 400;
+        return createJsonResponse({ error: msg }, status);
+      }
+    };
 
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const rawUrl =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-        ? input.pathname + input.search
-        : input.url;
+    const interceptedFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const rawUrl =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+          ? input.pathname + input.search
+          : input.url;
 
-    // Extract relative /api/* path if same-origin
-    let apiPath: string | null = null;
-    if (rawUrl.startsWith('/api/')) {
-      apiPath = rawUrl;
-    } else if (rawUrl.startsWith(window.location.origin + '/api/')) {
-      apiPath = rawUrl.slice(window.location.origin.length);
-    }
+      // Extract relative /api/* path if same-origin
+      let apiPath: string | null = null;
+      if (rawUrl.startsWith('/api/')) {
+        apiPath = rawUrl;
+      } else if (rawUrl.startsWith(window.location.origin + '/api/')) {
+        apiPath = rawUrl.slice(window.location.origin.length);
+      }
 
-    if (!apiPath) {
-      return originalFetch(input, init);
-    }
+      if (!apiPath) {
+        return originalFetch(input, init);
+      }
 
-    // If on Vercel or known static host, handle locally immediately without triggering 404 network errors
-    if (isStaticHostEnvironment() || !navigator.onLine) {
-      return executeLocalAsResponse(apiPath, init);
-    }
-
-    try {
-      const res = await originalFetch(input, init);
-      const contentType = res.headers.get('content-type') || '';
-
-      // If the host returned 404, 405, 502, 503, 504 or HTML/plain-text instead of JSON, switch to local engine
-      if (
-        res.status === 404 ||
-        res.status === 405 ||
-        res.status >= 502 ||
-        !contentType.includes('application/json')
-      ) {
-        sessionStorage.setItem('softplus_static_mode', 'true');
+      // If on Vercel or known static host, handle locally immediately without triggering 404 network errors
+      if (isStaticHostEnvironment() || !navigator.onLine) {
         return executeLocalAsResponse(apiPath, init);
       }
 
-      return res;
+      try {
+        const res = await originalFetch(input, init);
+        const contentType = res.headers.get('content-type') || '';
+
+        // If the host returned 404, 405, 502, 503, 504 or HTML/plain-text instead of JSON, switch to local engine
+        if (
+          res.status === 404 ||
+          res.status === 405 ||
+          res.status >= 502 ||
+          !contentType.includes('application/json')
+        ) {
+          sessionStorage.setItem('softplus_static_mode', 'true');
+          return executeLocalAsResponse(apiPath, init);
+        }
+
+        return res;
+      } catch {
+        sessionStorage.setItem('softplus_static_mode', 'true');
+        return executeLocalAsResponse(apiPath, init);
+      }
+    };
+
+    // Safely attempt to define property or assign without throwing if fetch has only a getter
+    try {
+      Object.defineProperty(window, 'fetch', {
+        value: interceptedFetch,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
     } catch {
-      sessionStorage.setItem('softplus_static_mode', 'true');
-      return executeLocalAsResponse(apiPath, init);
+      try {
+        (window as any).fetch = interceptedFetch;
+      } catch {
+        // window.fetch is read-only in this sandbox environment; useApi will handle local fallback
+      }
     }
-  };
+  } catch {
+    // Safe fallback if environment prohibits intercepting window.fetch
+  }
 }
+
 

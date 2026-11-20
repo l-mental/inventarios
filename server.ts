@@ -171,9 +171,46 @@ try { db.exec("ALTER TABLE products ADD COLUMN batch_number TEXT"); } catch (e) 
 try { db.exec("ALTER TABLE products ADD COLUMN expiry_date TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE products ADD COLUMN is_combo INTEGER DEFAULT 0"); } catch (e) {}
 try { db.exec("ALTER TABLE products ADD COLUMN combo_items TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN min_stock INTEGER DEFAULT 5"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN branch_stocks TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN image_url TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN design_type TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN color_name TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN color_hex TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN thickness TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN width_m REAL DEFAULT 0.85"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN standard_length_m REAL DEFAULT 3.0"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN unit_type TEXT DEFAULT 'm'"); } catch (e) {}
+
+try { db.exec("ALTER TABLE sale_details ADD COLUMN sheet_length_m REAL"); } catch (e) {}
+try { db.exec("ALTER TABLE sale_details ADD COLUMN sheet_count REAL"); } catch (e) {}
+try { db.exec("ALTER TABLE sale_details ADD COLUMN measurement_summary TEXT"); } catch (e) {}
+
+try { db.exec("ALTER TABLE quotation_details ADD COLUMN sheet_length_m REAL"); } catch (e) {}
+try { db.exec("ALTER TABLE quotation_details ADD COLUMN sheet_count REAL"); } catch (e) {}
+try { db.exec("ALTER TABLE quotation_details ADD COLUMN measurement_summary TEXT"); } catch (e) {}
+
+try { db.exec("ALTER TABLE sales ADD COLUMN cancel_reason TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE sales ADD COLUMN cancelled_at DATETIME"); } catch (e) {}
+try { db.exec("ALTER TABLE sales ADD COLUMN cancelled_by TEXT"); } catch (e) {}
 
 try { db.exec("ALTER TABLE customers ADD COLUMN points INTEGER DEFAULT 0"); } catch (e) {}
 try { db.exec("ALTER TABLE customers ADD COLUMN credit_balance REAL DEFAULT 0"); } catch (e) {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS branch_transfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    from_branch TEXT NOT NULL,
+    to_branch TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    notes TEXT,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS cash_sessions (
@@ -289,44 +326,270 @@ const seed = () => {
   if (suppliersCount.count === 0) {
     console.log('Seeding suppliers');
     const sellers = [
-      ['Distribuidora FarmaPlus', '77771234', 'ventas@farmaplus.bo', 'Av. Las Américas #102'],
-      ['Laboratorios B4', '76543210', 'contacto@laboratoriosb4.com', 'Calle Industrial #55'],
-      ['LUBRAX & Salud', '74504589', 'ventas@lubraxsalud.com', 'Zona Central #890']
+      ['Aceros & Bobinas del Sur S.A.', '77771234', 'ventas@acerossur.bo', 'Parque Industrial PI-14'],
+      ['Metalúrgica Altiplano', '76543210', 'bobinas@metalaltiplano.com', 'Carretera al Norte Km 12'],
+      ['Policarbonatos & Techos Latam', '74504589', 'importaciones@politech.com', 'Zona Franca Industrial']
     ];
     sellers.forEach(([name, phone, email, address]) => {
       db.prepare('INSERT INTO suppliers (name, phone, email, address) VALUES (?, ?, ?, ?)').run(name, phone, email, address);
     });
   }
 
-  // Seed 15 Products
+  // Seed Calamina Products
   const productsCount = db.prepare('SELECT count(*) as count FROM products WHERE active = 1').get() as { count: number };
   if (productsCount.count === 0) {
-    console.log('Seeding 15 products');
+    console.log('Seeding calamina products');
     const defaultProducts = [
-      ['Paracetamol 500mg (Caja x20)', 'Analgésico y antipirético para el alivio del dolor y la fiebre', 12.50, 85, 'Farmacia'],
-      ['Ibuprofeno 400mg (Caja x10)', 'Antiinflamatorio no esteroideo para dolores musculares', 15.00, 60, 'Farmacia'],
-      ['Amoxicilina 500mg (Caja x12)', 'Antibiótico de amplio espectro bacteriano', 28.00, 42, 'Farmacia'],
-      ['Alcohol en Gel 500ml', 'Desinfectante antibacteriano con glicerina hidratante', 18.00, 95, 'Higiene'],
-      ['Mascarillas Quirúrgicas (Caja x50)', 'Protección respiratoria de triple capa termosellada', 25.00, 110, 'Protección'],
-      ['Suero Oral Rehidratante (Sobre)', 'Electrolitos para prevención de la deshidratación', 6.50, 150, 'Farmacia'],
-      ['Gasas Estériles (Pack x10)', 'Material de curación y apósito estéril para heridas', 8.00, 75, 'Material Médico'],
-      ['Termómetro Digital Infrarrojo', 'Medición rápida de temperatura corporal sin contacto', 85.00, 18, 'Equipos'],
-      ['Vitamina C 1000mg Efervescente', 'Refuerzo inmunológico en tabletas efervescentes x10', 22.00, 64, 'Suplementos'],
-      ['Jarabe para la Tos Infantil 120ml', 'Alivio eficaz de la tos seca y productiva para niños', 32.50, 30, 'Farmacia'],
-      ['Protector Solar FPS 50+ 200ml', 'Alta protección dermatológica contra rayos UVA y UVB', 65.00, 24, 'Cuidado Personal'],
-      ['Algodón Hidrófilo 200g', 'Puro algodón blanco absorbente para uso médico y cosmético', 11.00, 80, 'Higiene'],
-      ['Tiras Reactivas Glucosa (x50)', 'Tiras para glucómetro de monitoreo de glucosa en sangre', 95.00, 15, 'Diagnóstico'],
-      ['Tensiómetro Digital de Brazo', 'Medidor de presión arterial automático con pantalla LCD', 140.00, 12, 'Equipos'],
-      ['Crema Cicatrizante Antibacteriana', 'Pomada antiséptica para heridas leves y quemaduras', 24.00, 45, 'Dermatología']
+      {
+        name: 'Calamina Ondulada Zinc Galvanizada 0.35mm',
+        description: 'Lámina de acero galvanizado por inmersión en caliente, perfil ondulado tradicional resistente a granizo y corrosión.',
+        price: 28.50,
+        cost_price: 19.20,
+        stock: 600,
+        min_stock: 0,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 500, 'Sucursal Norte': 100 }),
+        category: 'Calamina Ondulada',
+        barcode: 'CAL-ZNC-035',
+        batch_number: 'BOB-26Z01',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+        design_type: 'Ondulada Sinusoidal',
+        color_name: 'Zinc Galvanizado',
+        color_hex: '#94a3b8',
+        thickness: '0.35 mm',
+        width_m: 0.80,
+        standard_length_m: 3.00,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Tipo Teja Colonial Rojo Teja 0.40mm',
+        description: 'Acero prepintado estampado tipo teja española clásica con recubrimiento UV de alta durabilidad térmica.',
+        price: 48.00,
+        cost_price: 31.50,
+        stock: 420,
+        min_stock: 40,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 300, 'Sucursal Norte': 120 }),
+        category: 'Calamina Teja Colonial',
+        barcode: 'CAL-TEJ-040',
+        batch_number: 'BOB-26R02',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
+        design_type: 'Teja Colonial Española',
+        color_name: 'Rojo Teja',
+        color_hex: '#b91c1c',
+        thickness: '0.40 mm',
+        width_m: 1.00,
+        standard_length_m: 3.60,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Trapezoidal TR4 Azul Rey 0.40mm',
+        description: 'Perfil trapezoidal estructural de 4 crestas para naves industriales, tinglados y cubiertas de gran luz.',
+        price: 42.00,
+        cost_price: 27.80,
+        stock: 380,
+        min_stock: 30,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 260, 'Sucursal Norte': 120 }),
+        category: 'Calamina Trapezoidal',
+        barcode: 'CAL-TR4-AZ40',
+        batch_number: 'BOB-26A03',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_azul_trapezoidal_1795139680949.jpg',
+        design_type: 'Trapezoidal TR4',
+        color_name: 'Azul Rey',
+        color_hex: '#1d4ed8',
+        thickness: '0.40 mm',
+        width_m: 1.05,
+        standard_length_m: 6.00,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Trapezoidal TR4 Verde Bosque 0.40mm',
+        description: 'Chapa trapezoidal prepintada con esmalte poliéster horneado color verde bosque para viviendas y cabañas.',
+        price: 42.00,
+        cost_price: 27.80,
+        stock: 290,
+        min_stock: 25,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 200, 'Sucursal Norte': 90 }),
+        category: 'Calamina Trapezoidal',
+        barcode: 'CAL-TR4-VR40',
+        batch_number: 'BOB-26V04',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_verde_trapezoidal_1795139681356.jpg',
+        design_type: 'Trapezoidal TR4',
+        color_name: 'Verde Bosque',
+        color_hex: '#15803d',
+        thickness: '0.40 mm',
+        width_m: 1.05,
+        standard_length_m: 4.00,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Ondulada Gris Antracita Mate 0.45mm',
+        description: 'Acabado arquitectónico mate oscuro de alta resistencia estructural, ideal para techos modernos y fachadas.',
+        price: 45.50,
+        cost_price: 30.20,
+        stock: 310,
+        min_stock: 20,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 220, 'Sucursal Norte': 90 }),
+        category: 'Calamina Ondulada',
+        barcode: 'CAL-OND-ANT45',
+        batch_number: 'BOB-26G05',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_antracita_ondulada_1795139681264.jpg',
+        design_type: 'Ondulada Sinusoidal',
+        color_name: 'Gris Antracita',
+        color_hex: '#334155',
+        thickness: '0.45 mm',
+        width_m: 0.85,
+        standard_length_m: 3.60,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Translúcida Policarbonato Cristal 0.80mm',
+        description: 'Lámina ondulada translúcida con filtro UV para iluminación natural de galpones, patios y lavanderías.',
+        price: 52.00,
+        cost_price: 33.40,
+        stock: 180,
+        min_stock: 15,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 120, 'Sucursal Norte': 60 }),
+        category: 'Calamina Translúcida',
+        barcode: 'CAL-POL-080',
+        batch_number: 'BOB-26P06',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_translucida_policarbonato_1795139681734.jpg',
+        design_type: 'Translúcida Policarbonato',
+        color_name: 'Cristal Translúcido',
+        color_hex: '#cbd5e1',
+        thickness: '0.80 mm (PC)',
+        width_m: 0.80,
+        standard_length_m: 3.00,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Ondulada Zinc Pesada 0.50mm',
+        description: 'Calamina galvanizada de calibre grueso reforzado para zonas de vientos fuertes y cubiertas comerciales.',
+        price: 39.00,
+        cost_price: 26.50,
+        stock: 250,
+        min_stock: 20,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 180, 'Sucursal Norte': 70 }),
+        category: 'Calamina Ondulada',
+        barcode: 'CAL-ZNC-050',
+        batch_number: 'BOB-26Z07',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+        design_type: 'Ondulada Sinusoidal',
+        color_name: 'Zinc Galvanizado',
+        color_hex: '#94a3b8',
+        thickness: '0.50 mm',
+        width_m: 0.85,
+        standard_length_m: 3.60,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Teja Colonial Rojo Terracota 0.45mm',
+        description: 'Perfil tipo teja de calibre 0.45 mm de alto espesor, terminación satinada antidecoloración.',
+        price: 54.00,
+        cost_price: 36.00,
+        stock: 210,
+        min_stock: 15,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 150, 'Sucursal Norte': 60 }),
+        category: 'Calamina Teja Colonial',
+        barcode: 'CAL-TEJ-045',
+        batch_number: 'BOB-26R08',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
+        design_type: 'Teja Colonial Española',
+        color_name: 'Rojo Teja',
+        color_hex: '#b91c1c',
+        thickness: '0.45 mm',
+        width_m: 1.00,
+        standard_length_m: 3.60,
+        unit_type: 'm'
+      },
+      {
+        name: 'Calamina Trapezoidal TR4 Azul Industrial 0.50mm',
+        description: 'Plancha trapezoidal pesada calibre 0.50 mm prepintada azul rey para tinglados de gran envergadura.',
+        price: 49.50,
+        cost_price: 33.20,
+        stock: 240,
+        min_stock: 0,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 160, 'Sucursal Norte': 80 }),
+        category: 'Calamina Trapezoidal',
+        barcode: 'CAL-TR4-AZ50',
+        batch_number: 'BOB-26A09',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_azul_trapezoidal_1795139680949.jpg',
+        design_type: 'Trapezoidal TR4',
+        color_name: 'Azul Rey',
+        color_hex: '#1d4ed8',
+        thickness: '0.50 mm',
+        width_m: 1.05,
+        standard_length_m: 6.00,
+        unit_type: 'm'
+      },
+      {
+        name: 'Cumbrera Metálica Rojo Teja (Desarrollo 40cm)',
+        description: 'Caballete de remate superior plegado en acero prepintado Rojo Teja, se vende por metro lineal.',
+        price: 24.00,
+        cost_price: 15.00,
+        stock: 120,
+        min_stock: 10,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 85, 'Sucursal Norte': 35 }),
+        category: 'Cumbreras y Canaletas',
+        barcode: 'ACC-CUM-ROJ',
+        batch_number: 'PLE-26C10',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
+        design_type: 'Cumbrera / Remate',
+        color_name: 'Rojo Teja',
+        color_hex: '#b91c1c',
+        thickness: '0.40 mm',
+        width_m: 0.40,
+        standard_length_m: 2.00,
+        unit_type: 'm'
+      },
+      {
+        name: 'Cumbrera Galvanizada Estándar (Desarrollo 40cm)',
+        description: 'Caballete galvanizado plegado para unión de dos aguas en cubiertas metálicas.',
+        price: 18.50,
+        cost_price: 11.40,
+        stock: 160,
+        min_stock: 0,
+        branch_stocks: JSON.stringify({ 'Sucursal Central': 110, 'Sucursal Norte': 50 }),
+        category: 'Cumbreras y Canaletas',
+        barcode: 'ACC-CUM-ZNC',
+        batch_number: 'PLE-26C11',
+        expiry_date: '2030-12-31',
+        image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+        design_type: 'Cumbrera / Remate',
+        color_name: 'Zinc Galvanizado',
+        color_hex: '#94a3b8',
+        thickness: '0.35 mm',
+        width_m: 0.40,
+        standard_length_m: 2.00,
+        unit_type: 'm'
+      }
     ];
 
     const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-    const insertProduct = db.prepare('INSERT INTO products (name, description, price, stock, category, active) VALUES (?, ?, ?, ?, ?, 1)');
+    const insertProduct = db.prepare(`
+      INSERT INTO products (
+        name, description, price, cost_price, stock, min_stock, branch_stocks,
+        category, barcode, batch_number, expiry_date, image_url, design_type,
+        color_name, color_hex, thickness, width_m, standard_length_m, unit_type, active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `);
     const insertMovement = db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)');
 
-    defaultProducts.forEach(([name, desc, price, stock, category]) => {
-      const res = insertProduct.run(name, desc, price, stock, category);
-      insertMovement.run(res.lastInsertRowid, adminUser.id, 'IN', stock, 'Carga inicial de inventario');
+    defaultProducts.forEach((p) => {
+      const res = insertProduct.run(
+        p.name, p.description, p.price, p.cost_price, p.stock, p.min_stock, p.branch_stocks,
+        p.category, p.barcode, p.batch_number, p.expiry_date, p.image_url, p.design_type,
+        p.color_name, p.color_hex, p.thickness, p.width_m, p.standard_length_m, p.unit_type
+      );
+      insertMovement.run(res.lastInsertRowid, adminUser.id, 'IN', p.stock, 'Carga inicial de bobinas (metros lineales)');
     });
   }
 
@@ -335,11 +598,11 @@ const seed = () => {
   if (customersCount.count === 0) {
     console.log('Seeding customers');
     const defaultCustomers = [
-      ['Juan Pérez Morales', 'juan.perez@gmail.com', '78945612', 'Av. 6 de Agosto #340'],
-      ['María Elena Quispe', 'maria.quispe@hotmail.com', '71239845', 'Calle Murillo #120'],
-      ['Carlos Mendoza Ruiz', 'carlos.mendoza@yahoo.com', '68521479', 'Zona Miraflores #55'],
-      ['Ana Lucía Fernández', 'ana.fernandez@gmail.com', '74125896', 'Av. Arce Edif. Illimani #402'],
-      ['Clínica Santa María', 'compras@santamaria.org', '22445566', 'Calle México #780']
+      ['Constructora Horizonte S.R.L.', 'compras@horizonte.bo', '78945612', 'Av. Cristo Redentor Km 5'],
+      ['Ferretería El Constructor', 'pedidos@elconstructor.bo', '71239845', 'Av. Mutualista #420'],
+      ['Arq. Roberto Mamani', 'rmamani@arqestudio.com', '68521479', 'Zona Equipetrol Calle 8'],
+      ['Inmobiliaria Cordillera', 'obras@cordillera.bo', '74125896', 'Av. Banzer #1200'],
+      ['Juan Carlos Condori', 'jc.condori@gmail.com', '77445566', 'Plan 3000 Av. Paurito']
     ];
     const insertCustomer = db.prepare('INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)');
     defaultCustomers.forEach(([name, email, phone, address]) => {
@@ -349,14 +612,14 @@ const seed = () => {
 
   // Seed System Settings
   const settingsCount = db.prepare('SELECT count(*) as count FROM system_settings').get() as { count: number };
-  if (settingsCount.count <= 1) { // only jwt_secret or empty
+  if (settingsCount.count <= 1) {
     console.log('Seeding system settings');
     const defaultSettings = [
-      ['company_name', 'Softplus'],
+      ['company_name', 'AcerTecho Calaminas S.R.L.'],
       ['company_nit', '1023456789'],
       ['currency', 'Bs'],
       ['phone', '77889900'],
-      ['address', 'Av. Principal #450, Edificio Comercial Softplus'],
+      ['address', 'Parque Industrial Norte Mza. 14, Santa Cruz'],
       ['tax_percentage', '13']
     ];
     const insertSetting = db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)');
@@ -365,127 +628,114 @@ const seed = () => {
     });
   }
 
-    // Seed Initial Sales if empty
-    const salesCount = db.prepare('SELECT count(*) as count FROM sales').get() as { count: number };
-    if (salesCount.count === 0) {
-      console.log('Seeding demo sales');
-      const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-      const firstCustomer = db.prepare('SELECT id FROM customers LIMIT 1').get() as { id: number } | undefined;
-      const sampleProducts = db.prepare('SELECT id, price FROM products LIMIT 3').all() as { id: number; price: number }[];
+  // Seed Initial Sales if empty
+  const salesCount = db.prepare('SELECT count(*) as count FROM sales').get() as { count: number };
+  if (salesCount.count === 0) {
+    console.log('Seeding demo sales');
+    const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
+    const firstCustomer = db.prepare('SELECT id FROM customers LIMIT 1').get() as { id: number } | undefined;
+    const sampleProducts = db.prepare('SELECT id, price, width_m FROM products LIMIT 3').all() as { id: number; price: number; width_m?: number }[];
 
-      if (sampleProducts.length > 0) {
-        const totalAmt = sampleProducts[0].price * 2 + sampleProducts[1].price;
-        const saleResult = db.prepare('INSERT INTO sales (user_id, customer_id, total, payment_method, cash_amount, paid_amount, with_invoice, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-          .run(adminUser.id, firstCustomer ? firstCustomer.id : null, totalAmt, 'CASH', totalAmt, totalAmt, 1, 'COMPLETED');
-        const saleId = saleResult.lastInsertRowid;
+    if (sampleProducts.length > 0) {
+      const targetProd = sampleProducts[1] || sampleProducts[0];
+      const qtyMeters = 36;
+      const totalAmt = Number((targetProd.price * qtyMeters).toFixed(2));
+      const saleResult = db.prepare('INSERT INTO sales (user_id, customer_id, total, payment_method, cash_amount, paid_amount, with_invoice, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(adminUser.id, firstCustomer ? firstCustomer.id : null, totalAmt, 'CASH', totalAmt, totalAmt, 1, 'COMPLETED');
+      const saleId = saleResult.lastInsertRowid;
 
-        db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
-          .run(saleId, sampleProducts[0].id, 2, sampleProducts[0].price, sampleProducts[0].price * 2);
-        if (sampleProducts[1]) {
-          db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
-            .run(saleId, sampleProducts[1].id, 1, sampleProducts[1].price, sampleProducts[1].price);
-        }
-      }
+      db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(saleId, targetProd.id, qtyMeters, targetProd.price, totalAmt, 3.60, 10, '10 planchas × 3.60 m = 36.00 m (36.00 m²)');
     }
+  }
 
-    // Backfill product cost_price, barcode, batch_number, expiry_date for existing products
-    const allProds = db.prepare('SELECT id, price, cost_price, barcode, batch_number, expiry_date FROM products').all() as any[];
-    const expiryDates = [
-      '2026-10-25', // Expiring very soon
-      '2026-11-15', // Expiring soon
-      '2027-03-20',
-      '2027-06-30',
-      '2027-09-15',
-      '2026-11-02', // Expiring soon
-      '2027-12-31',
-      '2028-05-10'
-    ];
-    allProds.forEach((p, idx) => {
-      const cost = p.cost_price && p.cost_price > 0 ? p.cost_price : Number((p.price * 0.62).toFixed(2));
-      const barcode = p.barcode || `777010${String(p.id).padStart(6, '0')}`;
-      const batch = p.batch_number || `LOT-26${String.fromCharCode(65 + (idx % 6))}${100 + idx}`;
-      const expiry = p.expiry_date || expiryDates[idx % expiryDates.length];
-      db.prepare('UPDATE products SET cost_price = ?, barcode = ?, batch_number = ?, expiry_date = ? WHERE id = ?')
-        .run(cost, barcode, batch, expiry, p.id);
+  const allProds = db.prepare('SELECT id, price, cost_price, barcode, batch_number, expiry_date FROM products').all() as any[];
+
+  // Seed a Combo/Pack product if none exists
+  const comboExists = db.prepare('SELECT count(*) as count FROM products WHERE is_combo = 1 AND active = 1').get() as { count: number };
+  if (comboExists.count === 0 && allProds.length >= 6) {
+    const comboItems = JSON.stringify([
+      { product_id: allProds[3].id, quantity: 1 },
+      { product_id: allProds[5].id, quantity: 1 }
+    ]);
+    db.prepare(`
+      INSERT INTO products (
+        name, description, price, cost_price, stock, min_stock, branch_stocks,
+        category, barcode, batch_number, expiry_date, is_combo, combo_items,
+        image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type, active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run(
+      'Pack Cubierta Mixta (Trapezoidal Verde + Luz Natural)',
+      'Combo de techo por medición: combina plancha Trapezoidal Verde Bosque con tragaluz Policarbonato.',
+      78.00,
+      51.00,
+      45,
+      0,
+      JSON.stringify({ 'Sucursal Central': 30, 'Sucursal Norte': 15 }),
+      'Packs de Techo',
+      'PCK-TEC-VER',
+      'PCK-26-01',
+      '2030-12-31',
+      comboItems,
+      '/src/assets/images/calamina_verde_trapezoidal_1795139681356.jpg',
+      'Pack Completo',
+      'Verde Bosque',
+      '#15803d',
+      '0.40 mm',
+      1.05,
+      3.00,
+      'm'
+    );
+  }
+
+  // Backfill customer loyalty points if all 0
+  const customersWithPoints = db.prepare('SELECT count(*) as count FROM customers WHERE points > 0').get() as { count: number };
+  if (customersWithPoints.count === 0) {
+    const custs = db.prepare('SELECT id FROM customers').all() as { id: number }[];
+    const samplePoints = [180, 120, 65, 240, 45];
+    custs.forEach((c, idx) => {
+      db.prepare('UPDATE customers SET points = ? WHERE id = ?').run(samplePoints[idx % samplePoints.length], c.id);
     });
+  }
 
-    // Seed a Combo/Pack product if none exists
-    const comboExists = db.prepare('SELECT count(*) as count FROM products WHERE is_combo = 1 AND active = 1').get() as { count: number };
-    if (comboExists.count === 0 && allProds.length >= 3) {
-      const comboItems = JSON.stringify([
-        { product_id: allProds[0].id, quantity: 1 },
-        { product_id: allProds[3]?.id || allProds[1].id, quantity: 1 },
-        { product_id: allProds[4]?.id || allProds[2].id, quantity: 1 }
-      ]);
-      db.prepare(`
-        INSERT INTO products (name, description, price, cost_price, stock, category, barcode, batch_number, expiry_date, is_combo, combo_items, active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1)
-      `).run(
-        'Pack Botiquín Familiar Bioseguridad',
-        'Combo promocional: Paracetamol + Alcohol en Gel + Mascarillas Quirúrgicas',
-        48.00,
-        29.50,
-        25,
-        'Promociones',
-        '777999000111',
-        'PACK-2026-01',
-        '2027-08-30',
-        comboItems
-      );
-    }
+  // Seed Operating Expenses if empty
+  const expensesCount = db.prepare('SELECT count(*) as count FROM expenses').get() as { count: number };
+  if (expensesCount.count === 0) {
+    const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
+    const today = new Date().toISOString().split('T')[0];
+    const defaultExpenses = [
+      ['Alquiler', 'Alquiler galpón de corte y almacenamiento Norte', 3200.00, today, 'QR'],
+      ['Servicios Básicos', 'Energía trifásica para perfiladora y cizalla', 680.00, today, 'CASH'],
+      ['Logística y Transporte', 'Flete camión grúa entrega de calaminas en obra', 350.00, today, 'CASH']
+    ];
+    const insertExpense = db.prepare('INSERT INTO expenses (user_id, category, description, amount, expense_date, payment_method) VALUES (?, ?, ?, ?, ?, ?)');
+    defaultExpenses.forEach(([cat, desc, amount, date, method]) => {
+      insertExpense.run(adminUser.id, cat, desc, amount, date, method);
+    });
+  }
 
-    // Backfill customer loyalty points if all 0
-    const customersWithPoints = db.prepare('SELECT count(*) as count FROM customers WHERE points > 0').get() as { count: number };
-    if (customersWithPoints.count === 0) {
-      const custs = db.prepare('SELECT id FROM customers').all() as { id: number }[];
-      const samplePoints = [120, 85, 40, 210, 350];
-      custs.forEach((c, idx) => {
-        db.prepare('UPDATE customers SET points = ? WHERE id = ?').run(samplePoints[idx % samplePoints.length], c.id);
-      });
-    }
+  // Seed an Open Cash Register Session if none exists
+  const cashSessionCount = db.prepare('SELECT count(*) as count FROM cash_sessions').get() as { count: number };
+  if (cashSessionCount.count === 0) {
+    const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
+    const sessionRes = db.prepare('INSERT INTO cash_sessions (user_id, opening_amount, extra_income, extra_expense, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(adminUser.id, 500.00, 100.00, 0.00, 'Apertura de turno Planta Central', 'OPEN');
+    db.prepare('INSERT INTO cash_movements (session_id, user_id, type, amount, reason) VALUES (?, ?, ?, ?, ?)')
+      .run(sessionRes.lastInsertRowid, adminUser.id, 'INCOME', 100.00, 'Fondo sencillo para corte y despacho');
+  }
 
-    // Seed Operating Expenses if empty
-    const expensesCount = db.prepare('SELECT count(*) as count FROM expenses').get() as { count: number };
-    if (expensesCount.count === 0) {
-      const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-      const today = new Date().toISOString().split('T')[0];
-      const defaultExpenses = [
-        ['Alquiler', 'Pago mensual de alquiler de local comercial', 1800.00, today, 'QR'],
-        ['Servicios Básicos', 'Factura de energía eléctrica y agua potable', 320.50, today, 'CASH'],
-        ['Internet y Sistemas', 'Servicio fibra óptica empresarial 300 Mbps', 210.00, today, 'QR'],
-        ['Logística y Transporte', 'Transporte de mercadería e insumos de almacén', 145.00, today, 'CASH']
-      ];
-      const insertExpense = db.prepare('INSERT INTO expenses (user_id, category, description, amount, expense_date, payment_method) VALUES (?, ?, ?, ?, ?, ?)');
-      defaultExpenses.forEach(([cat, desc, amount, date, method]) => {
-        insertExpense.run(adminUser.id, cat, desc, amount, date, method);
-      });
-    }
-
-    // Seed an Open Cash Register Session if none exists
-    const cashSessionCount = db.prepare('SELECT count(*) as count FROM cash_sessions').get() as { count: number };
-    if (cashSessionCount.count === 0) {
-      const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-      const sessionRes = db.prepare('INSERT INTO cash_sessions (user_id, opening_amount, extra_income, extra_expense, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(adminUser.id, 500.00, 50.00, 25.00, 'Apertura de turno principal', 'OPEN');
-      db.prepare('INSERT INTO cash_movements (session_id, user_id, type, amount, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionRes.lastInsertRowid, adminUser.id, 'INCOME', 50.00, 'Ingreso de sencillo para cambio');
-      db.prepare('INSERT INTO cash_movements (session_id, user_id, type, amount, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionRes.lastInsertRowid, adminUser.id, 'EXPENSE', 25.00, 'Compra de rollos térmicos para impresora');
-    }
-
-    // Seed a Demo Quotation if none exists
-    const quotationCount = db.prepare('SELECT count(*) as count FROM quotations').get() as { count: number };
-    if (quotationCount.count === 0 && allProds.length >= 2) {
-      const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-      const firstCustomer = db.prepare('SELECT id FROM customers LIMIT 1').get() as { id: number } | undefined;
-      const totalQ = allProds[0].price * 5 + allProds[1].price * 3;
-      const qRes = db.prepare('INSERT INTO quotations (user_id, customer_id, total, valid_until, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(adminUser.id, firstCustomer ? firstCustomer.id : null, totalQ, '2026-10-30', 'Cotización corporativa sujeta a disponibilidad', 'PENDING');
-      db.prepare('INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
-        .run(qRes.lastInsertRowid, allProds[0].id, 5, allProds[0].price, allProds[0].price * 5);
-      db.prepare('INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
-        .run(qRes.lastInsertRowid, allProds[1].id, 3, allProds[1].price, allProds[1].price * 3);
-    }
+  // Seed a Demo Quotation if none exists
+  const quotationCount = db.prepare('SELECT count(*) as count FROM quotations').get() as { count: number };
+  if (quotationCount.count === 0 && allProds.length >= 3) {
+    const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
+    const secondCustomer = db.prepare('SELECT id FROM customers LIMIT 1 OFFSET 1').get() as { id: number } | undefined;
+    const tr4Prod = allProds[2];
+    const totalQ = Number((tr4Prod.price * 60).toFixed(2));
+    const qRes = db.prepare('INSERT INTO quotations (user_id, customer_id, total, valid_until, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(adminUser.id, secondCustomer ? secondCustomer.id : null, totalQ, new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], 'Proforma corte a medida TR4 Azul Rey para tinglado 12x8m', 'PENDING');
+    db.prepare('INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(qRes.lastInsertRowid, tr4Prod.id, 60, tr4Prod.price, totalQ, 6.00, 10, '10 planchas × 6.00 m = 60.00 m (63.00 m²)');
+  }
 };
 seed();
 
@@ -694,8 +944,24 @@ async function startServer() {
   // Product Routes
   app.get('/api/products', authenticateToken, (req, res) => {
     try {
-      const products = db.prepare('SELECT * FROM products WHERE active = 1').all();
-      res.json(products);
+      const products = db.prepare('SELECT * FROM products WHERE active = 1').all() as any[];
+      const formatted = products.map((p) => {
+        let parsedBranches: Record<string, number> | undefined;
+        if (typeof p.branch_stocks === 'string') {
+          try {
+            parsedBranches = JSON.parse(p.branch_stocks);
+          } catch {
+            parsedBranches = { 'Sucursal Central': p.stock || 0, 'Sucursal Norte': 0 };
+          }
+        } else {
+          parsedBranches = p.branch_stocks;
+        }
+        return {
+          ...p,
+          branch_stocks: parsedBranches,
+        };
+      });
+      res.json(formatted);
     } catch (error: any) {
       console.error('Error fetching products:', error);
       res.status(500).json({ error: error.message });
@@ -703,29 +969,51 @@ async function startServer() {
   });
 
   app.post('/api/products', authenticateToken, isAdmin, (req: any, res) => {
-    const { name, description, price, cost_price, stock, category, barcode, batch_number, expiry_date, is_combo, combo_items } = req.body;
+    const {
+      name, description, price, cost_price, stock, min_stock, branch_stocks,
+      category, barcode, batch_number, expiry_date, is_combo, combo_items,
+      image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type
+    } = req.body;
     console.log('Creating product:', { name, price, stock, category });
     try {
-      const costVal = cost_price !== undefined ? Number(cost_price) : Number((Number(price) * 0.6).toFixed(2));
+      const costVal = cost_price !== undefined ? Number(cost_price) : Number((Number(price) * 0.65).toFixed(2));
+      const minStockVal = min_stock !== undefined && min_stock !== null && min_stock !== '' ? Math.max(0, Number(min_stock)) : 0;
+      const stockVal = Number(Number(stock || 0).toFixed(2));
+      const branchStocksVal = branch_stocks ? (typeof branch_stocks === 'string' ? branch_stocks : JSON.stringify(branch_stocks)) : JSON.stringify({ 'Sucursal Central': stockVal, 'Sucursal Norte': 0 });
+
       const result = db.prepare(`
-        INSERT INTO products (name, description, price, cost_price, stock, category, barcode, batch_number, expiry_date, is_combo, combo_items)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO products (
+          name, description, price, cost_price, stock, min_stock, branch_stocks, category,
+          barcode, batch_number, expiry_date, is_combo, combo_items,
+          image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         name,
         description || null,
         price,
         costVal,
-        stock,
-        category || 'Otros',
-        barcode || `777010${Math.floor(100000 + Math.random() * 900000)}`,
+        stockVal,
+        minStockVal,
+        branchStocksVal,
+        category || 'Calamina Ondulada',
+        barcode || `CAL-${Math.floor(100000 + Math.random() * 900000)}`,
         batch_number || null,
         expiry_date || null,
         is_combo ? 1 : 0,
-        combo_items ? (typeof combo_items === 'string' ? combo_items : JSON.stringify(combo_items)) : null
+        combo_items ? (typeof combo_items === 'string' ? combo_items : JSON.stringify(combo_items)) : null,
+        image_url || '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+        design_type || 'Ondulada Sinusoidal',
+        color_name || 'Zinc Galvanizado',
+        color_hex || '#94a3b8',
+        thickness || '0.35 mm',
+        width_m ? Number(width_m) : 0.85,
+        standard_length_m ? Number(standard_length_m) : 3.0,
+        unit_type || 'm'
       );
       
       db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(result.lastInsertRowid, req.user.id, 'IN', stock, 'Stock inicial');
+        .run(result.lastInsertRowid, req.user.id, 'IN', stockVal, 'Stock inicial (metros lineales)');
       
       logAudit(req.user.id, 'CREATE', 'PRODUCT', Number(result.lastInsertRowid), `Producto creado: ${name}`);
       res.json({ id: result.lastInsertRowid });
@@ -736,33 +1024,52 @@ async function startServer() {
   });
 
   app.put('/api/products/:id', authenticateToken, isAdmin, (req: any, res) => {
-    const { name, description, price, cost_price, stock, category, barcode, batch_number, expiry_date, is_combo, combo_items } = req.body;
-    const oldProduct = db.prepare('SELECT stock, cost_price FROM products WHERE id = ?').get(req.params.id) as any;
-    const costVal = cost_price !== undefined ? Number(cost_price) : (oldProduct?.cost_price || Number((Number(price) * 0.6).toFixed(2)));
+    const {
+      name, description, price, cost_price, stock, min_stock, branch_stocks,
+      category, barcode, batch_number, expiry_date, is_combo, combo_items,
+      image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type
+    } = req.body;
+    const oldProduct = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id) as any;
+    const costVal = cost_price !== undefined ? Number(cost_price) : (oldProduct?.cost_price || Number((Number(price) * 0.65).toFixed(2)));
+    const minStockVal = min_stock !== undefined && min_stock !== null && min_stock !== '' ? Math.max(0, Number(min_stock)) : (oldProduct?.min_stock ?? 0);
+    const stockVal = Number(Number(stock ?? oldProduct?.stock ?? 0).toFixed(2));
+    const branchStocksVal = branch_stocks ? (typeof branch_stocks === 'string' ? branch_stocks : JSON.stringify(branch_stocks)) : (oldProduct?.branch_stocks || JSON.stringify({ 'Sucursal Central': stockVal, 'Sucursal Norte': 0 }));
     
     db.prepare(`
       UPDATE products
-      SET name = ?, description = ?, price = ?, cost_price = ?, stock = ?, category = ?, barcode = ?, batch_number = ?, expiry_date = ?, is_combo = ?, combo_items = ?
+      SET name = ?, description = ?, price = ?, cost_price = ?, stock = ?, min_stock = ?, branch_stocks = ?,
+          category = ?, barcode = ?, batch_number = ?, expiry_date = ?, is_combo = ?, combo_items = ?,
+          image_url = ?, design_type = ?, color_name = ?, color_hex = ?, thickness = ?, width_m = ?, standard_length_m = ?, unit_type = ?
       WHERE id = ?
     `).run(
       name,
       description,
       price,
       costVal,
-      stock,
+      stockVal,
+      minStockVal,
+      branchStocksVal,
       category,
       barcode || null,
       batch_number || null,
       expiry_date || null,
       is_combo ? 1 : 0,
       combo_items ? (typeof combo_items === 'string' ? combo_items : JSON.stringify(combo_items)) : null,
+      image_url ?? oldProduct?.image_url ?? '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
+      design_type ?? oldProduct?.design_type ?? 'Ondulada Sinusoidal',
+      color_name ?? oldProduct?.color_name ?? 'Zinc Galvanizado',
+      color_hex ?? oldProduct?.color_hex ?? '#94a3b8',
+      thickness ?? oldProduct?.thickness ?? '0.35 mm',
+      width_m !== undefined ? Number(width_m) : (oldProduct?.width_m ?? 0.85),
+      standard_length_m !== undefined ? Number(standard_length_m) : (oldProduct?.standard_length_m ?? 3.0),
+      unit_type ?? oldProduct?.unit_type ?? 'm',
       req.params.id
     );
     
-    if (oldProduct && oldProduct.stock !== stock) {
-      const diff = stock - oldProduct.stock;
+    if (oldProduct && oldProduct.stock !== stockVal) {
+      const diff = Number((stockVal - oldProduct.stock).toFixed(2));
       db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(req.params.id, req.user.id, diff > 0 ? 'IN' : 'OUT', Math.abs(diff), 'Ajuste manual');
+        .run(req.params.id, req.user.id, diff > 0 ? 'IN' : 'OUT', Math.abs(diff), 'Ajuste manual de metraje');
     }
 
     logAudit(req.user.id, 'UPDATE', 'PRODUCT', Number(req.params.id), `Producto actualizado: ${name}`);
@@ -836,28 +1143,30 @@ async function startServer() {
 
       // 2. Process Items & Combo Components
       for (const item of items) {
+        const qty = Number(Number(item.quantity || 0).toFixed(2));
         const product = db.prepare('SELECT id, name, stock, is_combo, combo_items FROM products WHERE id = ?').get(item.id) as any;
-        if (!product || product.stock < item.quantity) {
-          throw new Error(`Stock insuficiente para el producto: ${product?.name || item.id}`);
+        if (!product || product.stock + 0.001 < qty) {
+          throw new Error(`Stock insuficiente para el material: ${product?.name || item.id}`);
         }
 
-        db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?')
-          .run(item.quantity, item.id);
+        const newStock = Math.max(0, Number((product.stock - qty).toFixed(2)));
+        db.prepare('UPDATE products SET stock = ? WHERE id = ?')
+          .run(newStock, item.id);
 
         db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-          .run(item.id, req.user.id, 'SALE', item.quantity, `Venta #${saleId}`);
+          .run(item.id, req.user.id, 'SALE', qty, item.measurement_summary ? `Venta #${saleId} (${item.measurement_summary})` : `Venta #${saleId}`);
 
         // If it's a combo/kit, also deduct stock of its individual component products
         if (product.is_combo && product.combo_items) {
           try {
             const components = JSON.parse(product.combo_items) as { product_id: number; quantity: number }[];
             for (const comp of components) {
-              const compQty = comp.quantity * item.quantity;
+              const compQty = Number((comp.quantity * qty).toFixed(2));
               const compProd = db.prepare('SELECT id, name, stock FROM products WHERE id = ?').get(comp.product_id) as any;
               if (compProd && compProd.stock >= compQty) {
-                db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(compQty, comp.product_id);
+                db.prepare('UPDATE products SET stock = ? WHERE id = ?').run(Number((compProd.stock - compQty).toFixed(2)), comp.product_id);
                 db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-                  .run(comp.product_id, req.user.id, 'SALE', compQty, `Componente Combo (${product.name}) - Venta #${saleId}`);
+                  .run(comp.product_id, req.user.id, 'SALE', compQty, `Componente Pack (${product.name}) - Venta #${saleId}`);
               }
             }
           } catch (err) {
@@ -865,8 +1174,20 @@ async function startServer() {
           }
         }
 
-        db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
-          .run(saleId, item.id, item.quantity, item.price, item.quantity * item.price);
+        const subtotalItem = Number((qty * Number(item.price)).toFixed(2));
+        db.prepare(`
+          INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          saleId,
+          item.id,
+          qty,
+          item.price,
+          subtotalItem,
+          item.sheet_length_m || null,
+          item.sheet_count || null,
+          item.measurement_summary || null
+        );
       }
 
       // 3. Update Customer Loyalty Points & Credit Balance
@@ -900,20 +1221,27 @@ async function startServer() {
     }
   });
 
-  app.post('/api/sales/:id/cancel', authenticateToken, isAdmin, (req: any, res) => {
+  app.post('/api/sales/:id/cancel', authenticateToken, (req: any, res) => {
+    const { reason } = req.body;
+    const cancelReason = reason || 'Anulación solicitada por el usuario';
     const transaction = db.transaction(() => {
       const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(req.params.id) as any;
       if (!sale) throw new Error('Venta no encontrada');
       if (sale.status === 'CANCELLED') throw new Error('La venta ya está anulada');
+      if (req.user.role !== 'Admin' && sale.user_id !== req.user.id) {
+        throw new Error('Solo un administrador o el vendedor de la factura pueden anularla.');
+      }
 
       const details = db.prepare('SELECT * FROM sale_details WHERE sale_id = ?').all(req.params.id) as any[];
       
       for (const detail of details) {
-        db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?')
-          .run(detail.quantity, detail.product_id);
+        const prod = db.prepare('SELECT stock FROM products WHERE id = ?').get(detail.product_id) as any;
+        const restored = Number(((prod?.stock || 0) + Number(detail.quantity || 0)).toFixed(2));
+        db.prepare('UPDATE products SET stock = ? WHERE id = ?')
+          .run(restored, detail.product_id);
         
         db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-          .run(detail.product_id, req.user.id, 'IN', detail.quantity, `Anulación Venta #${req.params.id}`);
+          .run(detail.product_id, req.user.id, 'IN', detail.quantity, `Anulación Factura #${req.params.id}: ${cancelReason}`);
       }
 
       if (sale.customer_id && sale.credit_amount > 0) {
@@ -922,14 +1250,96 @@ async function startServer() {
           .run(unpaid, sale.customer_id);
       }
 
-      db.prepare('UPDATE sales SET status = "CANCELLED" WHERE id = ?').run(req.params.id);
+      db.prepare(`
+        UPDATE sales 
+        SET status = 'CANCELLED', cancel_reason = ?, cancelled_at = CURRENT_TIMESTAMP, cancelled_by = ? 
+        WHERE id = ?
+      `).run(cancelReason, req.user.full_name || req.user.username, req.params.id);
       return true;
     });
 
     try {
       transaction();
-      logAudit(req.user.id, 'CANCEL', 'SALE', Number(req.params.id), `Venta anulada ID: ${req.params.id}`);
+      logAudit(req.user.id, 'CANCEL', 'SALE', Number(req.params.id), `Venta anulada ID: ${req.params.id}. Motivo: ${cancelReason}`);
       res.json({ success: true });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Branch & Transfers Routes
+  app.get('/api/branches', authenticateToken, (req, res) => {
+    res.json([
+      { id: 1, name: 'Sucursal Central', is_main: true },
+      { id: 2, name: 'Sucursal Norte', is_main: false },
+      { id: 3, name: 'Sucursal Sur', is_main: false }
+    ]);
+  });
+
+  app.get('/api/branches/transfers', authenticateToken, (req, res) => {
+    try {
+      const transfers = db.prepare(`
+        SELECT bt.*, p.name as product_name, u.full_name as user_name
+        FROM branch_transfers bt
+        JOIN products p ON bt.product_id = p.id
+        JOIN users u ON bt.user_id = u.id
+        ORDER BY bt.created_at DESC
+      `).all();
+      res.json(transfers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/branches/transfer', authenticateToken, (req: any, res) => {
+    const { product_id, from_branch, to_branch, quantity, notes } = req.body;
+    const qty = Number(quantity);
+
+    if (!product_id) return res.status(400).json({ error: 'Debe seleccionar el producto a transferir.' });
+    if (!from_branch || !to_branch) return res.status(400).json({ error: 'Debe especificar sucursal origen y destino.' });
+    if (from_branch === to_branch) return res.status(400).json({ error: 'La sucursal de origen y la de destino deben ser diferentes.' });
+    if (isNaN(qty) || qty <= 0) return res.status(400).json({ error: 'La cantidad a transferir debe ser mayor a 0.' });
+
+    const transaction = db.transaction(() => {
+      const prod = db.prepare('SELECT * FROM products WHERE id = ?').get(product_id) as any;
+      if (!prod) throw new Error('Producto no encontrado en inventario.');
+
+      let branches: Record<string, number> = {};
+      try {
+        if (prod.branch_stocks) branches = JSON.parse(prod.branch_stocks);
+      } catch {}
+
+      if (!branches[from_branch]) {
+        branches['Sucursal Central'] = branches['Sucursal Central'] ?? Math.floor(prod.stock * 0.7);
+        branches['Sucursal Norte'] = branches['Sucursal Norte'] ?? Math.ceil(prod.stock * 0.3);
+      }
+
+      const available = Number(branches[from_branch] || 0);
+      if (available + 0.001 < qty) {
+        throw new Error(`Metraje insuficiente en ${from_branch}. Disponible actual: ${available} m.`);
+      }
+
+      branches[from_branch] = Number((available - qty).toFixed(2));
+      branches[to_branch] = Number((Number(branches[to_branch] || 0) + qty).toFixed(2));
+
+      db.prepare('UPDATE products SET branch_stocks = ? WHERE id = ?')
+        .run(JSON.stringify(branches), product_id);
+
+      const result = db.prepare(`
+        INSERT INTO branch_transfers (product_id, from_branch, to_branch, quantity, notes, user_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(product_id, from_branch, to_branch, qty, notes || null, req.user.id);
+
+      db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
+        .run(product_id, req.user.id, 'ADJUSTMENT', qty, `Traspaso entre sucursales: ${qty} m de [${from_branch}] a [${to_branch}]${notes ? ` (${notes})` : ''}`);
+
+      return { transferId: result.lastInsertRowid, branches };
+    });
+
+    try {
+      const { transferId, branches } = transaction();
+      logAudit(req.user.id, 'TRANSFER', 'BRANCH_TRANSFER', Number(transferId), `Traspaso de ${qty} m de ${from_branch} a ${to_branch}`);
+      res.json({ success: true, transferId, updated_stocks: branches });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
@@ -1131,10 +1541,20 @@ async function startServer() {
       const quotationId = resQ.lastInsertRowid;
 
       for (const item of items) {
+        const qty = Number(Number(item.quantity || 0).toFixed(2));
         db.prepare(`
-          INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(quotationId, item.id, item.quantity, item.price, item.quantity * item.price);
+          INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          quotationId,
+          item.id,
+          qty,
+          item.price,
+          Number((qty * item.price).toFixed(2)),
+          item.sheet_length_m || null,
+          item.sheet_count || null,
+          item.measurement_summary || null
+        );
       }
       return quotationId;
     });
@@ -1536,7 +1956,13 @@ async function startServer() {
       const salesCount = isSeller ? db.prepare(salesCountQuery).get(userId) : db.prepare(salesCountQuery).get();
 
       const productsCount = db.prepare('SELECT COUNT(*) as count FROM products WHERE active = 1').get() as any;
-      const lowStock = db.prepare('SELECT COUNT(*) as count FROM products WHERE stock < 10 AND active = 1').get() as any;
+      const lowStock = db.prepare(`
+        SELECT COUNT(*) as count FROM products 
+        WHERE active = 1 AND (
+          (COALESCE(min_stock, 5) > 0 AND stock <= COALESCE(min_stock, 5))
+          OR (COALESCE(min_stock, 5) = 0 AND stock < 0)
+        )
+      `).get() as any;
       const customersCount = db.prepare('SELECT COUNT(*) as count FROM customers').get() as any;
       
       const recentSalesQuery = `
@@ -1559,6 +1985,32 @@ async function startServer() {
       `;
       const salesByDay = isSeller ? db.prepare(salesByDayQuery).all(userId) : db.prepare(salesByDayQuery).all();
 
+      const calcPeriod = (days: number) => {
+        const q = `
+          SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+          FROM sales
+          WHERE status = 'COMPLETED' AND datetime(created_at) >= datetime('now', '-${days} days')
+          ${isSeller ? 'AND user_id = ?' : ''}
+        `;
+        const r = isSeller ? db.prepare(q).get(userId) as any : db.prepare(q).get() as any;
+        const count = r?.count || 0;
+        const revenue = r?.revenue || 0;
+        return {
+          count,
+          revenue,
+          avgTicket: count > 0 ? revenue / count : 0
+        };
+      };
+
+      const periodMetrics = {
+        day: calcPeriod(1),
+        week: calcPeriod(7),
+        month: calcPeriod(30),
+        bimonth: calcPeriod(60),
+        quarter: calcPeriod(90),
+        year: calcPeriod(365)
+      };
+
       res.json({
         revenue: totalSales?.total || 0,
         salesCount: salesCount?.count || 0,
@@ -1566,7 +2018,8 @@ async function startServer() {
         lowStock: lowStock?.count || 0,
         customersCount: customersCount?.count || 0,
         recentSales: recentSales || [],
-        salesByDay: salesByDay || []
+        salesByDay: salesByDay || [],
+        periodMetrics
       });
     } catch (error: any) {
       console.error(`[Stats] Error:`, error);
@@ -1617,7 +2070,7 @@ async function startServer() {
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
   app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n🚀 ¡Servidor de Farmacia iniciado con éxito!');
+    console.log('\n🚀 ¡Servidor AcerTecho Pro (Calaminas por Medición) iniciado con éxito!');
     console.log(`🏠 Local:    http://localhost:${PORT}`);
     console.log(`🌐 Red:     http://0.0.0.0:${PORT}\n`);
   });

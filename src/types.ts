@@ -14,12 +14,22 @@ export interface Product {
   price: number;
   cost_price?: number;
   stock: number;
+  min_stock?: number;
+  branch_stocks?: Record<string, number>;
   category: string;
   barcode?: string;
   batch_number?: string;
   expiry_date?: string;
   is_combo?: number;
   combo_items?: string;
+  image_url?: string;
+  design_type?: string;
+  color_name?: string;
+  color_hex?: string;
+  thickness?: string;
+  width_m?: number;
+  standard_length_m?: number;
+  unit_type?: 'm' | 'm2' | 'unidad';
 }
 
 export interface Customer {
@@ -94,6 +104,9 @@ export interface Sale {
   customer_id?: number;
   total: number;
   status: 'COMPLETED' | 'CANCELLED';
+  cancel_reason?: string;
+  cancelled_at?: string;
+  cancelled_by?: string;
   payment_method: 'CASH' | 'QR' | 'MIXED' | 'CREDIT';
   cash_amount?: number;
   qr_amount?: number;
@@ -107,6 +120,21 @@ export interface Sale {
   customer_phone?: string;
   details?: SaleDetail[];
 }
+
+export interface BranchTransfer {
+  id: number;
+  product_id: number;
+  product_name: string;
+  from_branch: string;
+  to_branch: string;
+  quantity: number;
+  notes?: string;
+  user_id: number;
+  user_name: string;
+  created_at: string;
+}
+
+export type SalesPeriod = 'day' | 'week' | 'month' | 'bimonth' | 'quarter' | 'year';
 
 export interface CashMovement {
   id: number;
@@ -222,6 +250,9 @@ export interface SaleDetail {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  sheet_length_m?: number;
+  sheet_count?: number;
+  measurement_summary?: string;
 }
 
 export interface DashboardStats {

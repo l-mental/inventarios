@@ -20,10 +20,10 @@ export default defineConfig(({mode}) => {
           skipWaiting: true
         },
         manifest: {
-          name: 'Softplus Enterprise',
-          short_name: 'Softplus',
-          description: 'Sistema de Ventas e Inventario Offline-First',
-          theme_color: '#00d1ff',
+          name: 'AcerTecho Pro Calaminas',
+          short_name: 'AcerTecho',
+          description: 'Sistema de Gestión de Calaminas, Cortes y Cubiertas por Medición',
+          theme_color: '#c2410c',
           icons: [
             {
               src: 'https://cdn-icons-png.flaticon.com/512/1162/1162499.png',

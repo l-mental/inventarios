@@ -41,7 +41,7 @@ export default function AIChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: '¡Bienvenido a **Softplus Enterprise**! 🚀 Soy tu asistente comercial de élite. Estoy conectado a tu base de datos en tiempo real para ayudarte a escalar tu negocio. ¿Qué tal si analizamos las ventas de hoy o generamos un reporte de inventario?' }
+    { role: 'model', text: '¡Bienvenido a **AcerTecho Pro**! Soy tu asistente comercial para gestión de calaminas por medición. Estoy conectado a tu inventario de metros lineales, sucursales y ventas en tiempo real. ¿Analizamos stock o ventas de hoy?' }
   ]);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -83,7 +83,7 @@ export default function AIChat() {
     doc.setFontSize(22);
     doc.setTextColor(20, 20, 20);
     doc.setFont("helvetica", "bold");
-    doc.text("Reporte de Gestión Softplus", 105, 20, { align: 'center' });
+    doc.text("Reporte de Gestión AcerTecho Pro", 105, 20, { align: 'center' });
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
@@ -131,7 +131,7 @@ export default function AIChat() {
       addSection("Personal Autorizado", [["USUARIO", "NOMBRE", "ROL"]], body);
     }
 
-    doc.save(`Softplus_Reporte_${type}_${new Date().getTime()}.pdf`);
+    doc.save(`AcerTecho_Reporte_${type}_${new Date().getTime()}.pdf`);
   };
 
   const handleSend = async (customPrompt?: string) => {
@@ -148,8 +148,8 @@ export default function AIChat() {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const systemInstruction = `
-        Eres el "Asistente Comercial de Élite" de Softplus Enterprise. 
-        TONO: Profesional, estratégico, proactivo y entusiasta.
+        Eres el "Asistente Comercial" de AcerTecho Calaminas S.R.L., empresa especializada en venta de calaminas y cubiertas por medición lineal (metros). 
+        TONO: Profesional, estratégico, proactivo.
         OBJETIVO: Ayudar a ${user?.full_name} (${user?.role}) a optimizar el negocio.
 
         ESTADÍSTICAS REALES:

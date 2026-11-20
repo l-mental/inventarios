@@ -41,11 +41,11 @@ interface SettingsContextType {
 }
 
 const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
-  company_name: 'Softplus',
-  company_nit: '1023456789',
+  company_name: 'AcerTecho Calaminas S.R.L.',
+  company_nit: '1028495021',
   currency: 'Bs',
   phone: '77889900',
-  address: 'Av. Principal #450, Edificio Comercial Softplus',
+  address: 'Parque Industrial Norte Mz. 4, Planta de Laminado y Corte',
   tax_percentage: '13',
 };
 

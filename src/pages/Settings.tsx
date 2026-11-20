@@ -76,7 +76,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `softplus_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `acertecho_backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -116,7 +116,7 @@ export default function Settings() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre de la Empresa</label>
-              <input type="text" defaultValue="Softplus Enterprise" className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand outline-none text-slate-900 dark:text-white" />
+              <input type="text" defaultValue="AcerTecho Calaminas S.R.L." className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand outline-none text-slate-900 dark:text-white" />
             </div>
             
             <div>
@@ -251,25 +251,18 @@ export default function Settings() {
                   setDbStatus('checking');
                   // 1. Seed Products
                   const products = [
-                    { name: 'iPhone 15 Pro', description: 'Titanio', price: 1200, stock: 10, category: 'Electrónica' },
-                    { name: 'MacBook Air M3', description: '13-inch', price: 1400, stock: 5, category: 'Electrónica' },
-                    { name: 'Auriculares Sony', description: 'XM5', price: 350, stock: 15, category: 'Electrónica' },
-                    { name: 'Monitor 4K LG', description: '27-inch', price: 450, stock: 8, category: 'Electrónica' },
-                    { name: 'Teclado Mecánico', description: 'RGB', price: 120, stock: 20, category: 'Electrónica' },
-                    { name: 'Café Premium', description: '1kg', price: 25, stock: 50, category: 'Alimentos' },
-                    { name: 'Chocolate 80%', description: 'Orgánico', price: 8, stock: 100, category: 'Alimentos' },
-                    { name: 'Pantalón Jean', description: 'Slim Fit', price: 55, stock: 30, category: 'Ropa' },
-                    { name: 'Camiseta Básica', description: 'Blanca M', price: 20, stock: 60, category: 'Ropa' },
-                    { name: 'Zapatillas Running', description: 'Talla 42', price: 110, stock: 12, category: 'Ropa' }
+                    { name: 'Calamina Ondulada Zinc Galvanizada 0.35mm', description: 'Plancha galvanizada estándar por metro lineal', price: 42, stock: 600, category: 'Calamina Ondulada' },
+                    { name: 'Calamina Teja Colonial Rojo Terracota 0.40mm', description: 'Acabado colonial prepintado rojo teja', price: 68, stock: 340, category: 'Calamina Teja Colonial' },
+                    { name: 'Calamina Trapezoidal Azul Rey TR4 0.45mm', description: 'Perfil estructural TR4 azul rey', price: 62, stock: 280, category: 'Calamina Trapezoidal' },
                   ];
                   
                   for(const p of products) await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(p) });
 
                   // 2. Seed Customers
                   const customers = [
-                    { name: 'Juan Pérez', email: 'juan@example.com', phone: '555-0101', address: 'Calle 123' },
-                    { name: 'María García', email: 'maria@example.com', phone: '555-0102', address: 'Av. Libertador' },
-                    { name: 'Soporte Softplus', email: 'admin@softplus.com', phone: '555-0999', address: 'Centro Tech' }
+                    { name: 'Constructora Horizonte S.R.L.', email: 'obras@horizonte.com', phone: '71023456', address: 'Av. Cristo Redentor Km 6' },
+                    { name: 'Arq. Carlos Mendoza', email: 'cmendoza@estudio.bo', phone: '76543210', address: 'Equipetrol Norte' },
+                    { name: 'Soporte AcerTecho', email: 'ventas@acertecho.com', phone: '33445566', address: 'Parque Industrial Norte' }
                   ];
                   for(const c of customers) await apiFetch('/api/customers', { method: 'POST', body: JSON.stringify(c) });
 

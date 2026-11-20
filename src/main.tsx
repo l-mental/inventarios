@@ -5,8 +5,12 @@ import App from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
-// Install global /api/* interceptor immediately so Vercel/static deployments never trigger 404
-installLocalApiInterceptor();
+// Install global /api/* interceptor safely so Vercel/static deployments never trigger 404
+try {
+  installLocalApiInterceptor();
+} catch {
+  // Safe fallback
+}
 
 // Normalize path URLs (e.g. /login or /dashboard) to hash routes if opened directly
 if (

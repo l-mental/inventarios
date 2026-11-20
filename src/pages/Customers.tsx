@@ -231,7 +231,7 @@ export default function Customers() {
                   )}
                   {waPhone && (
                     <a
-                      href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${c.name}, le saludamos de Softplus. Tienes ${c.points || 0} puntos acumulados en tu cuenta.`)}`}
+                      href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${c.name}, le saludamos de AcerTecho Calaminas. Tienes ${c.points || 0} puntos acumulados en tu cuenta.`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all"

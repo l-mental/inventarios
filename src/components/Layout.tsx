@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AIChat from './AIChat';
+import SalesFloatingWidget from './SalesFloatingWidget';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Layout() {
@@ -41,17 +42,17 @@ export default function Layout() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Tablero Principal', icon: LayoutDashboard, roles: ['Admin', 'Vendedor'] },
-    { id: 'pos', label: 'Venta Directa', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
-    { id: 'purchases', label: 'Compras', icon: Truck, roles: ['Admin', 'Vendedor'] },
+    { id: 'pos', label: 'Cotizar / POS Medición', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
+    { id: 'purchases', label: 'Compras Bobinas', icon: Truck, roles: ['Admin', 'Vendedor'] },
     { 
       id: 'inventario-group', 
-      label: 'Inventario', 
+      label: 'Planta y Stock', 
       icon: Database, 
       roles: ['Admin', 'Vendedor'],
       isGroup: true,
       subItems: [
-        { id: 'products', label: 'Gestión Catálogo', icon: Package },
-        { id: 'inventory', label: 'Stock e Insumos', icon: History },
+        { id: 'products', label: 'Catálogo Calaminas', icon: Package },
+        { id: 'inventory', label: 'Metraje y Traspasos', icon: History },
       ]
     },
     { id: 'sales', label: 'Historial Ventas', icon: ShoppingBag, roles: ['Admin', 'Vendedor'] },
@@ -70,8 +71,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#f8fafc] dark:bg-[#020617] overflow-hidden selection:bg-brand/10 custom-scrollbar">
-      <div className="noise-overlay" />
+    <div className="flex h-screen w-full bg-[#f4f5f7] dark:bg-[#090d16] overflow-hidden selection:bg-brand/10 custom-scrollbar">
       
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
@@ -88,17 +88,18 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 w-64 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col z-[70] transition-transform duration-300
+        fixed inset-y-0 left-0 w-64 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col z-[70] transition-transform duration-300
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:static lg:translate-x-0
       `}>
+        <div className="corrugated-accent-bar w-full shrink-0" />
         <div className="h-20 px-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
           <div className="w-9 h-9 bg-brand rounded flex items-center justify-center shadow-lg shadow-brand/20">
-            <ShoppingCart className="text-white w-5 h-5" />
+            <Package className="text-white w-5 h-5" />
           </div>
           <div className="cursor-pointer" onClick={() => handleNavigate('dashboard')}>
-            <h1 className="font-display font-black text-slate-900 dark:text-white tracking-tight text-lg uppercase italic">Softplus</h1>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.25em] -mt-1 leading-none">Intelligence</p>
+            <h1 className="font-display font-black text-slate-900 dark:text-white tracking-tight text-lg uppercase italic">AcerTecho</h1>
+            <p className="text-[9px] text-brand font-black uppercase tracking-[0.2em] -mt-1 leading-none">Pro Calaminas</p>
           </div>
         </div>
 
@@ -200,17 +201,20 @@ export default function Layout() {
       </aside>
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] dark:bg-[#020617] relative">
-        <header className="h-20 px-6 lg:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl flex items-center justify-between sticky top-0 z-[40]">
-          <div className="flex items-center gap-6">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#f4f5f7] dark:bg-[#090d16] relative">
+        <div className="corrugated-accent-bar w-full shrink-0" />
+        <header className="h-20 px-6 lg:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl flex items-center justify-between sticky top-0 z-[40]">
+          <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded lg:hidden transition-colors border border-slate-200 dark:border-slate-700"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="space-y-0.5">
-              {/* Se eliminó la etiqueta de contexto redundante */}
+            <div className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+              <span className="text-brand">AcerTecho S.R.L.</span>
+              <span>·</span>
+              <span>Venta &amp; Corte por Medición</span>
             </div>
           </div>
 
@@ -283,6 +287,7 @@ export default function Layout() {
         </main>
 
         <AIChat />
+        <SalesFloatingWidget />
       </div>
     </div>
   );
