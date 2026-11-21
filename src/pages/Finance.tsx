@@ -164,7 +164,7 @@ export default function Finance() {
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sellerRows), 'Ranking_Vendedores');
 
-    XLSX.writeFile(wb, `Reporte_Contable_AcerTecho_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Reporte_Contable_AgroPartes_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (

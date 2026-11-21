@@ -3,15 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useApi } from '../hooks/useApi';
 import { Product } from '../types';
-import CalaminaImage from '../components/CalaminaImage';
 import {
-  CALAMINA_CATEGORIES,
-  CALAMINA_DESIGNS,
-  CALAMINA_COLOR_SWATCHES,
-  CALAMINA_THICKNESSES,
-  CALAMINA_IMAGES,
-  formatMeter,
-} from '../lib/calaminaCatalog';
+  TRACTOR_CATEGORIES,
+  TRACTOR_BRANDS,
+  TRACTOR_UNITS,
+  TRACTOR_SUPPLIERS_LIST,
+  getStockStatus,
+  getBrandAccent,
+} from '../data/tractorPartsCatalog';
 import {
   Plus,
   Edit2,
@@ -29,16 +28,17 @@ import {
   Upload,
   Barcode,
   Printer,
-  Ruler,
+  Wrench,
   ArrowRightLeft,
-  Palette,
+  Cog,
+  Truck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import BranchTransferModal from '../components/BranchTransferModal';
 
 function BarcodeSVG({ value, height = 42 }: { value: string; height?: number }) {
-  const code = value || 'CAL-000001';
+  const code = value || 'REP-0001';
   const bars: number[] = [];
   for (let i = 0; i < code.length; i++) {
     const charCode = code.charCodeAt(i);
@@ -84,13 +84,13 @@ export default function Products() {
   const [transferProductId, setTransferProductId] = useState<number | undefined>(undefined);
   const [selectedForLabels, setSelectedForLabels] = useState<number[]>([]);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
-  const [comboComponents, setComboComponents] = useState<{ product_id: number; quantity: number }[]>([]);
   const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [filters, setFilters] = useState({
     search: '',
     category: '',
-    color: '',
-    stockStatus: 'all', // all, low, out, combos
+    brand: '',
+    supplier: '',
+    stockStatus: 'all', // all, normal, bajo, sin_stock
   });
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -119,29 +119,28 @@ export default function Products() {
   };
 
   const handleExport = () => {
-    const dataToExport = products.map(p => ({
-      ID: p.id,
-      Codigo_SKU: p.barcode || '',
-      Nombre: p.name,
-      Categoria: p.category,
-      Diseno: p.design_type || '',
-      Color: p.color_name || '',
-      Espesor: p.thickness || '',
-      Ancho_Util_m: p.width_m || 0.85,
-      Largo_Estandar_m: p.standard_length_m || 3.0,
-      Bobina_Lote: p.batch_number || '',
-      Costo_Por_Metro: p.cost_price || 0,
-      Precio_Por_Metro: p.price,
-      Stock_Metros: p.stock,
-      Stock_Minimo_Metros: p.min_stock ?? 0,
-      Es_Pack: p.is_combo ? 'SI' : 'NO',
-      Descripcion: p.description || '',
-    }));
+    const dataToExport = products.map(p => {
+      const st = getStockStatus(p);
+      return {
+        Codigo: p.barcode || `REP-${p.id}`,
+        OEM_Equivalencias: p.oem_codes || '',
+        Nombre: p.name,
+        Categoria: p.category,
+        Marca: p.brand || 'GENERAL',
+        Unidad: p.unit_type || 'UNIDAD',
+        Proveedor: p.supplier_name || p.batch_number || 'GENERAL',
+        Precio_Compra: p.cost_price || 0,
+        Precio_Venta: p.price,
+        Stock_Total: p.stock,
+        Stock_Minimo: p.min_stock ?? 0,
+        Estado_Stock: st === 'sin_stock' ? 'Sin Stock' : st === 'bajo' ? 'Bajo' : 'Normal',
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Catalogo_Calaminas');
-    XLSX.writeFile(wb, `Catalogo_AcerTecho_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Repuestos_Tractores');
+    XLSX.writeFile(wb, `Catalogo_AgroPartes_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,21 +162,21 @@ export default function Products() {
 
         for (const item of data) {
           try {
+            const rawMin = item.Stock_Minimo ?? item['Stock Mínimo'] ?? item.min_stock ?? 0;
+            const parsedMin = Math.max(0, parseInt(String(rawMin), 10) || 0);
             const productData = {
-              name: item.Nombre || item.name || '',
-              description: item.Descripcion || item.Descripción || item.description || '',
-              price: parseFloat(item.Precio_Por_Metro || item.Precio_Venta || item.Precio || item.price || 0),
-              cost_price: parseFloat(item.Costo_Por_Metro || item.Costo_Unitario || item.cost_price || 0),
-              stock: parseFloat(item.Stock_Metros || item.Stock || item.stock || 0),
-              min_stock: parseFloat(item.Stock_Minimo_Metros || item.min_stock || 0),
-              category: item.Categoria || item.Categoría || item.category || CALAMINA_CATEGORIES[0],
-              design_type: item.Diseno || item.design_type || CALAMINA_DESIGNS[0],
-              color_name: item.Color || item.color_name || 'Zinc Galvanizado',
-              thickness: item.Espesor || item.thickness || '0.35 mm',
-              width_m: parseFloat(item.Ancho_Util_m || item.width_m || 0.85),
-              standard_length_m: parseFloat(item.Largo_Estandar_m || item.standard_length_m || 3.0),
-              barcode: item.Codigo_SKU || item.Codigo_Barras || item.barcode || '',
-              batch_number: item.Bobina_Lote || item.Lote || item.batch_number || '',
+              barcode: String(item.Codigo ?? item.Código ?? item.barcode ?? '').trim(),
+              oem_codes: String(item.OEM_Equivalencias ?? item['OEM / Equivalencias'] ?? item.oem_codes ?? '').trim(),
+              name: String(item.Nombre ?? item.name ?? '').trim(),
+              category: String(item.Categoria ?? item.Categoría ?? item.category ?? TRACTOR_CATEGORIES[0]).trim(),
+              brand: String(item.Marca ?? item.brand ?? 'GENERAL').trim(),
+              unit_type: String(item.Unidad ?? item.unit_type ?? 'UNIDAD').trim(),
+              supplier_name: String(item.Proveedor ?? item.supplier_name ?? 'GENERAL').trim(),
+              cost_price: parseFloat(item.Precio_Compra ?? item['Precio Compra'] ?? item.cost_price ?? 0) || 0,
+              price: parseFloat(item.Precio_Venta ?? item['Precio Venta'] ?? item.price ?? 0) || 0,
+              stock: parseInt(String(item.Stock_Total ?? item['Stock Total'] ?? item.stock ?? 0), 10) || 0,
+              min_stock: parsedMin,
+              description: String(item.Descripcion ?? item.description ?? '').trim(),
             };
 
             if (!productData.name) continue;
@@ -210,65 +209,46 @@ export default function Products() {
   const handleDelete = async (id: number) => {
     try {
       await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
-      setStatusBanner({ type: 'success', text: 'Material retirado del catálogo activo.' });
+      setStatusBanner({ type: 'success', text: 'Repuesto retirado del catálogo activo.' });
       fetchProducts();
     } catch (err: any) {
       if (err.message !== 'Sesión expirada') setStatusBanner({ type: 'error', text: err.message });
     }
   };
 
-  const isLowStock = (p: Product) => {
-    const minThreshold = p.min_stock !== undefined ? p.min_stock : 0;
-    if (minThreshold === 0) {
-      return p.stock < 0;
-    }
-    return p.stock <= minThreshold;
-  };
-
   const openEditModal = (product?: Partial<Product>) => {
     const target: Partial<Product> = product
       ? { ...product }
       : {
-          category: CALAMINA_CATEGORIES[0],
-          design_type: CALAMINA_DESIGNS[0],
-          color_name: CALAMINA_COLOR_SWATCHES[0].name,
-          color_hex: CALAMINA_COLOR_SWATCHES[0].hex,
-          image_url: CALAMINA_IMAGES.zincOndulada,
-          thickness: '0.35 mm',
-          width_m: 0.85,
-          standard_length_m: 3.0,
-          unit_type: 'm',
-          barcode: `CAL-${Math.floor(100000 + Math.random() * 900000)}`,
-          batch_number: `BOB-26-${Math.floor(100 + Math.random() * 900)}`,
-          expiry_date: '2030-12-31',
-          is_combo: 0,
+          barcode: `REP-${Math.floor(1000 + Math.random() * 9000)}`,
+          oem_codes: '',
+          name: '',
+          category: TRACTOR_CATEGORIES[0],
+          brand: TRACTOR_BRANDS[0],
+          unit_type: 'UNIDAD',
+          supplier_name: TRACTOR_SUPPLIERS_LIST[0],
+          cost_price: 0,
+          price: 0,
           stock: 0,
           min_stock: 0,
+          description: '',
         };
-    if (target.min_stock === undefined) target.min_stock = 0;
+    if (target.min_stock === undefined || target.min_stock === null) target.min_stock = 0;
     setEditingProduct(target);
-    if (target.combo_items) {
-      try {
-        setComboComponents(JSON.parse(target.combo_items));
-      } catch {
-        setComboComponents([]);
-      }
-    } else {
-      setComboComponents([]);
-    }
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editingProduct) return;
     try {
-      const method = editingProduct?.id ? 'PUT' : 'POST';
-      const url = editingProduct?.id ? `/api/products/${editingProduct.id}` : '/api/products';
+      const method = editingProduct.id ? 'PUT' : 'POST';
+      const url = editingProduct.id ? `/api/products/${editingProduct.id}` : '/api/products';
       const minStockVal =
-        editingProduct?.min_stock !== undefined &&
-        editingProduct?.min_stock !== null &&
-        String(editingProduct?.min_stock) !== ''
-          ? Math.max(0, parseFloat(String(editingProduct.min_stock)) || 0)
+        editingProduct.min_stock !== undefined &&
+        editingProduct.min_stock !== null &&
+        String(editingProduct.min_stock) !== ''
+          ? Math.max(0, Number(editingProduct.min_stock) || 0)
           : 0;
 
       await apiFetch(url, {
@@ -276,13 +256,14 @@ export default function Products() {
         body: JSON.stringify({
           ...editingProduct,
           min_stock: minStockVal,
-          combo_items: editingProduct?.is_combo ? JSON.stringify(comboComponents) : null,
+          batch_number: editingProduct.supplier_name || editingProduct.batch_number || 'GENERAL',
+          unit_type: editingProduct.unit_type || 'UNIDAD',
         }),
       });
 
       setIsModalOpen(false);
       setEditingProduct(null);
-      setStatusBanner({ type: 'success', text: 'Material sincronizado en catálogo.' });
+      setStatusBanner({ type: 'success', text: 'Repuesto guardado en catálogo.' });
       fetchProducts();
     } catch (err: any) {
       if (err.message !== 'Sesión expirada') setStatusBanner({ type: 'error', text: err.message });
@@ -290,50 +271,50 @@ export default function Products() {
   };
 
   const filteredProducts = products.filter(p => {
-    const q = filters.search.toLowerCase();
+    const q = filters.search.trim().toLowerCase();
     const matchesSearch =
+      !q ||
       p.name.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q) ||
-      (p.color_name && p.color_name.toLowerCase().includes(q)) ||
-      (p.design_type && p.design_type.toLowerCase().includes(q)) ||
       (p.barcode && p.barcode.toLowerCase().includes(q)) ||
-      (p.batch_number && p.batch_number.toLowerCase().includes(q));
+      (p.oem_codes && p.oem_codes.toLowerCase().includes(q)) ||
+      (p.brand && p.brand.toLowerCase().includes(q)) ||
+      (p.supplier_name && p.supplier_name.toLowerCase().includes(q)) ||
+      p.category.toLowerCase().includes(q);
     const matchesCategory = filters.category === '' || p.category === filters.category;
-    const matchesColor = filters.color === '' || p.color_name === filters.color;
-    const matchesStock =
-      filters.stockStatus === 'all' ||
-      (filters.stockStatus === 'low' && isLowStock(p) && p.stock >= 0) ||
-      (filters.stockStatus === 'out' && p.stock <= 0) ||
-      (filters.stockStatus === 'combos' && Boolean(p.is_combo));
-    return matchesSearch && matchesCategory && matchesColor && matchesStock;
+    const matchesBrand = filters.brand === '' || (p.brand || 'GENERAL') === filters.brand;
+    const matchesSupplier =
+      filters.supplier === '' || (p.supplier_name || p.batch_number || '') === filters.supplier;
+    const stockState = getStockStatus(p);
+    const matchesStock = filters.stockStatus === 'all' || filters.stockStatus === stockState;
+    return matchesSearch && matchesCategory && matchesBrand && matchesSupplier && matchesStock;
   });
 
   const stats = {
     total: products.length,
-    totalMeters: Number(products.reduce((acc, p) => acc + (p.stock || 0), 0).toFixed(2)),
-    lowStock: products.filter(p => isLowStock(p) && p.stock >= 0).length,
-    combos: products.filter(p => Boolean(p.is_combo)).length,
+    totalUnits: products.reduce((acc, p) => acc + Number(p.stock || 0), 0),
+    lowStock: products.filter(p => getStockStatus(p) === 'bajo').length,
+    outOfStock: products.filter(p => getStockStatus(p) === 'sin_stock').length,
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">
-            Dashboard <ChevronRight className="w-3 h-3 text-brand" /> Inventario{' '}
-            <ChevronRight className="w-3 h-3 text-brand" /> Catálogo de Calaminas
+            Dashboard <ChevronRight className="w-3 h-3 text-brand" /> Almacén{' '}
+            <ChevronRight className="w-3 h-3 text-brand" /> Catálogo de Repuestos
           </div>
           <div className="flex items-center gap-4">
             <div className="p-3 bg-brand text-white rounded-xl shadow-lg shadow-brand/20">
-              <Archive className="w-6 h-6" />
+              <Wrench className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tight uppercase leading-none">
-                Catálogo por Medición
+                Catálogo de Repuestos de Tractores
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-                Perfiles, Colores, Calibres (mm), Ancho Útil y Metraje por Sucursal
+                Código Interno, Equivalencias OEM, Marca, Proveedor, Precios y Control Multi-Sucursal
               </p>
             </div>
           </div>
@@ -342,7 +323,7 @@ export default function Products() {
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx, .xls, .csv" />
           <button
             onClick={() => setShowBarcodeModal(true)}
-            className="p-3 text-brand bg-brand/5 border border-brand/20 rounded-lg hover:bg-brand/10 transition-all shadow-sm flex items-center gap-2"
+            className="p-3 text-brand bg-brand/5 border border-brand/20 rounded-lg hover:bg-brand/10 transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
             title="Generador e Impresión de Etiquetas"
           >
             <Barcode className="w-5 h-5" />
@@ -351,7 +332,7 @@ export default function Products() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="p-3 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+            className="p-3 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
             title="Importar Excel/CSV"
           >
             <Upload className={`w-5 h-5 ${importing ? 'animate-bounce' : ''}`} />
@@ -359,7 +340,7 @@ export default function Products() {
           </button>
           <button
             onClick={handleExport}
-            className="p-3 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+            className="p-3 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
             title="Exportar a Excel"
           >
             <Download className="w-5 h-5" />
@@ -370,8 +351,8 @@ export default function Products() {
               setTransferProductId(undefined);
               setShowTransferModal(true);
             }}
-            className="p-3 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2"
-            title="Traspaso de Metraje entre Sucursales"
+            className="p-3 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
+            title="Traspaso de Unidades entre Sucursales"
           >
             <ArrowRightLeft className="w-5 h-5 text-brand" />
             <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">Traspaso</span>
@@ -386,10 +367,10 @@ export default function Products() {
           {isAdmin && (
             <button
               onClick={() => openEditModal()}
-              className="bg-brand hover:bg-brand/90 text-white px-5 py-3 rounded-lg font-display font-black uppercase tracking-wider text-xs shadow-lg shadow-brand/20 transition-all active:scale-95 flex items-center gap-2 border-b-4 border-brand-muted"
+              className="bg-brand hover:bg-brand/90 text-white px-5 py-3 rounded-lg font-display font-black uppercase tracking-wider text-xs shadow-lg shadow-brand/20 transition-all active:scale-95 flex items-center gap-2 border-b-4 border-brand-muted whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              Nueva Calamina / Pack
+              Nuevo Repuesto
             </button>
           )}
         </div>
@@ -412,38 +393,38 @@ export default function Products() {
 
       {/* Filters Section */}
       <div className="tech-card p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-              Búsqueda por Diseño, Código o Bobina
+              Búsqueda por Código, OEM o Nombre
             </label>
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand/50" />
               <input
                 type="text"
-                placeholder="Ondulada, Teja, SKU o Bobina..."
+                placeholder="Ej. 4949, EM9532, Perkins, Retén..."
                 value={filters.search}
                 onChange={e => setFilters({ ...filters, search: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-brand"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-brand text-slate-900 dark:text-white"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-              Perfil / Categoría
+              Categoría / Sistema
             </label>
             <div className="relative">
               <Layers className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand/50" />
               <select
                 value={filters.category}
                 onChange={e => setFilters({ ...filters, category: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold uppercase outline-none focus:border-brand"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold uppercase outline-none focus:border-brand text-slate-900 dark:text-white"
               >
-                <option value="">TODOS LOS PERFILES</option>
-                {CALAMINA_CATEGORIES.map(cat => (
+                <option value="">TODAS LAS CATEGORÍAS</option>
+                {TRACTOR_CATEGORIES.map(cat => (
                   <option key={cat} value={cat}>
-                    {cat.toUpperCase()}
+                    {cat}
                   </option>
                 ))}
               </select>
@@ -452,53 +433,73 @@ export default function Products() {
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-              Estado de Stock (Metros)
+              Proveedor
+            </label>
+            <div className="relative">
+              <Truck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand/50" />
+              <select
+                value={filters.supplier}
+                onChange={e => setFilters({ ...filters, supplier: e.target.value })}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold uppercase outline-none focus:border-brand text-slate-900 dark:text-white"
+              >
+                <option value="">TODOS LOS PROVEEDORES</option>
+                {TRACTOR_SUPPLIERS_LIST.map(sup => (
+                  <option key={sup} value={sup}>
+                    {sup}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+              Estado Stock
             </label>
             <div className="relative">
               <Archive className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand/50" />
               <select
                 value={filters.stockStatus}
                 onChange={e => setFilters({ ...filters, stockStatus: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold uppercase outline-none focus:border-brand"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold uppercase outline-none focus:border-brand text-slate-900 dark:text-white"
               >
-                <option value="all">TODOS LOS MATERIALES</option>
-                <option value="low">ALERTA: BAJO STOCK MÍNIMO</option>
-                <option value="out">SIN METRAJE (0 m)</option>
-                <option value="combos">SOLO PACKS DE TECHO</option>
+                <option value="all">TODOS LOS ESTADOS</option>
+                <option value="normal">NORMAL (SOBRE MÍNIMO)</option>
+                <option value="bajo">BAJO STOCK MÍNIMO</option>
+                <option value="sin_stock">SIN STOCK (0)</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Color Filter Strip */}
+        {/* Tractor Brand Filter Strip */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1">
-            <Palette className="w-3.5 h-3.5 text-brand" /> Color:
+            <Cog className="w-3.5 h-3.5 text-brand" /> Marca:
           </span>
           <button
             type="button"
-            onClick={() => setFilters({ ...filters, color: '' })}
+            onClick={() => setFilters({ ...filters, brand: '' })}
             className={`px-3 py-1 rounded text-[10px] font-bold uppercase border transition-all ${
-              filters.color === ''
+              filters.brand === ''
                 ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
                 : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
             }`}
           >
-            Todos
+            Todas
           </button>
-          {CALAMINA_COLOR_SWATCHES.map(sw => (
+          {TRACTOR_BRANDS.map(brand => (
             <button
-              key={sw.name}
+              key={brand}
               type="button"
-              onClick={() => setFilters({ ...filters, color: filters.color === sw.name ? '' : sw.name })}
-              className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase border flex items-center gap-1.5 transition-all ${
-                filters.color === sw.name
+              onClick={() => setFilters({ ...filters, brand: filters.brand === brand ? '' : brand })}
+              className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase border transition-all ${
+                filters.brand === brand
                   ? 'bg-brand/10 border-brand text-brand'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-brand/40'
               }`}
             >
-              <span className="w-3 h-3 rounded-full border border-black/15" style={{ backgroundColor: sw.hex }} />
-              {sw.name}
+              {brand}
             </button>
           ))}
         </div>
@@ -511,87 +512,103 @@ export default function Products() {
             <BarChart3 className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Referencias</p>
-            <p className="text-sm font-black text-slate-900 dark:text-white tabular-nums">{stats.total}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Repuestos</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white tabular-nums">{filteredProducts.length} / {stats.total}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg">
-            <Ruler className="w-4 h-4" />
+            <Layers className="w-4 h-4" />
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
-              Metraje Total en Stock
+              Unidades en Stock
             </p>
             <p className="text-sm font-black text-slate-900 dark:text-white tabular-nums">
-              {formatMeter(stats.totalMeters)}
+              {stats.totalUnits.toLocaleString()} uds
             </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-rose-50 dark:bg-rose-950/30 text-rose-500 rounded-lg">
-            <TrendingDown className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Stock Bajo</p>
-            <p className="text-sm font-black text-rose-500 tabular-nums">{stats.lowStock}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-amber-50 dark:bg-amber-950/30 text-amber-600 rounded-lg">
-            <Layers className="w-4 h-4" />
+            <TrendingDown className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Packs Techo</p>
-            <p className="text-sm font-black text-amber-600 tabular-nums">{stats.combos}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Stock Bajo</p>
+            <p className="text-sm font-black text-amber-600 tabular-nums">{stats.lowStock}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-rose-50 dark:bg-rose-950/30 text-rose-500 rounded-lg">
+            <Archive className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Sin Stock (0)</p>
+            <p className="text-sm font-black text-rose-500 tabular-nums">{stats.outOfStock}</p>
           </div>
         </div>
       </div>
 
-      {/* Table Section */}
+      {/* Table Section with exact Spreadsheet Columns */}
       <div className="tech-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900/50">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Calamina / Diseño / Color
+              <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800">
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  Código / OEM
                 </th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Especificaciones de Medición
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Repuesto / Nombre
                 </th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Bobina / Categoría
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  Categoría
                 </th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                  Costo / Precio (m)
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  Marca
                 </th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Metraje en Stock
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  Unidad
                 </th>
-                {isAdmin && (
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                    Acciones
-                  </th>
-                )}
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  Proveedor
+                </th>
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">
+                  P. Compra
+                </th>
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">
+                  P. Venta
+                </th>
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">
+                  Stock Total
+                </th>
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">
+                  Stock Mínimo
+                </th>
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">
+                  Estado Stock
+                </th>
+                <th className="px-4 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-24 text-center">
+                  <td colSpan={12} className="py-24 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-brand animate-spin" />
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
-                        Cargando Catálogo de Calaminas...
+                        Cargando Catálogo de Repuestos...
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-24 text-center">
-                    <div className="flex flex-col items-center gap-3 opacity-30">
+                  <td colSpan={12} className="py-24 text-center">
+                    <div className="flex flex-col items-center gap-3 opacity-40">
                       <Archive className="w-12 h-12 text-slate-400" />
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Sin Resultados</p>
                     </div>
@@ -599,121 +616,131 @@ export default function Products() {
                 </tr>
               ) : (
                 filteredProducts.map(product => {
-                  const cost = product.cost_price || Number((product.price * 0.65).toFixed(2));
-                  const margin = product.price > 0 ? Math.round(((product.price - cost) / product.price) * 100) : 0;
+                  const stockStatus = getStockStatus(product);
+                  const brandStyle = getBrandAccent(product.brand);
+                  const minStockVal = product.min_stock !== undefined ? product.min_stock : 0;
 
                   return (
                     <tr
                       key={product.id}
                       className="hover:bg-brand/[0.02] dark:hover:bg-brand/5 transition-colors group"
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3.5">
-                          <CalaminaImage product={product} aspectClass="w-16 h-12 shrink-0" showColorDot />
-                          <div className="min-w-0">
-                            <p className="text-xs font-display font-extrabold text-slate-900 dark:text-white truncate tracking-tight leading-snug">
-                              {product.name}
-                            </p>
-                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                              {product.barcode || `CAL-${String(product.id).padStart(4, '0')}`} ·{' '}
-                              <span className="text-slate-600 dark:text-slate-300 font-sans font-semibold">
-                                {product.color_name || 'Galvanizado'}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <div className="space-y-0.5 text-xs">
-                          <p className="font-bold text-slate-700 dark:text-slate-200">
-                            {product.design_type || product.category}
-                          </p>
-                          <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                            Calibre {product.thickness || '0.35 mm'} · Ancho {product.width_m || 0.85} m · Corte Base{' '}
-                            {product.standard_length_m || 3.0} m
-                          </p>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{product.category}</p>
-                          <p className="text-[10px] font-mono text-slate-400">
-                            Bobina: {product.batch_number || 'BOB-GEN'}
-                          </p>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-right tabular-nums">
-                        <p className="text-sm font-display font-black text-slate-900 dark:text-brand">
-                          {formatPrice(product.price)} / m
+                      <td className="px-4 py-3.5 align-top max-w-[180px]">
+                        <p className="text-xs font-mono font-black text-slate-900 dark:text-white whitespace-nowrap">
+                          {product.barcode || `REP-${product.id}`}
                         </p>
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          Costo: {formatPrice(cost)} · Margen {margin}%
+                        <p
+                          className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5"
+                          title={product.oem_codes || ''}
+                        >
+                          {product.oem_codes || '-'}
                         </p>
                       </td>
 
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1 w-36">
-                          <div className="flex justify-between items-center text-[11px] font-black tabular-nums">
-                            <span className={isLowStock(product) ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}>
-                              {formatMeter(product.stock)}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-mono">
-                              Mín: {product.min_stock !== undefined ? product.min_stock : 0} m
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 ${
-                                isLowStock(product) ? 'bg-rose-500' : 'bg-brand'
-                              }`}
-                              style={{ width: `${Math.min((product.stock / 500) * 100, 100)}%` }}
-                            />
-                          </div>
-                          {product.branch_stocks && (
-                            <div
-                              className="text-[9px] text-slate-400 truncate font-mono"
-                              title={`Central: ${product.branch_stocks['Sucursal Central'] ?? 0} m | Norte: ${product.branch_stocks['Sucursal Norte'] ?? 0} m`}
-                            >
-                              Cent: {product.branch_stocks['Sucursal Central'] ?? 0} m · Nort:{' '}
-                              {product.branch_stocks['Sucursal Norte'] ?? 0} m
-                            </div>
+                      <td className="px-4 py-3.5 align-top min-w-[220px] max-w-[280px]">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                          {product.name}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          {product.category}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <span className={`inline-block px-2 py-0.5 rounded border text-[10px] font-black uppercase ${brandStyle.bg} ${brandStyle.text} ${brandStyle.border}`}>
+                          {product.brand || 'GENERAL'}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300">
+                          {product.unit_type || 'UNIDAD'}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top max-w-[160px]">
+                        <span className="text-[11px] text-slate-600 dark:text-slate-300 block truncate" title={product.supplier_name || product.batch_number || ''}>
+                          {product.supplier_name || product.batch_number || 'GENERAL'}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top text-right font-mono text-xs text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap">
+                        {formatPrice(product.cost_price || 0)}
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top text-right font-mono font-black text-xs text-slate-900 dark:text-brand tabular-nums whitespace-nowrap">
+                        {formatPrice(product.price)}
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top text-right tabular-nums whitespace-nowrap">
+                        <p className="text-xs font-mono font-black text-slate-900 dark:text-white">
+                          {product.stock}
+                        </p>
+                        {product.branch_stocks && (
+                          <p
+                            className="text-[9px] font-mono text-slate-400 mt-0.5"
+                            title={`Central: ${product.branch_stocks['Sucursal Central'] ?? 0} | Norte: ${product.branch_stocks['Sucursal Norte'] ?? 0} | Sur: ${product.branch_stocks['Sucursal Sur'] ?? 0}`}
+                          >
+                            C:{product.branch_stocks['Sucursal Central'] ?? 0} · N:{product.branch_stocks['Sucursal Norte'] ?? 0}
+                          </p>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top text-center font-mono text-xs text-slate-600 dark:text-slate-300 tabular-nums">
+                        {minStockVal}
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top text-center whitespace-nowrap">
+                        {stockStatus === 'sin_stock' ? (
+                          <span className="inline-block px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-[10px] font-black uppercase">
+                            Sin Stock
+                          </span>
+                        ) : stockStatus === 'bajo' ? (
+                          <span className="inline-block px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 text-[10px] font-black uppercase">
+                            Bajo
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 text-[10px] font-black uppercase">
+                            Normal
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => {
+                              setTransferProductId(product.id);
+                              setShowTransferModal(true);
+                            }}
+                            className="p-2 text-slate-500 hover:text-brand bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"
+                            title="Traspasar unidades entre sucursales"
+                          >
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                          </button>
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => openEditModal(product)}
+                                className="p-2 text-slate-500 hover:text-brand bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(product.id)}
+                                className="p-2 text-slate-500 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"
+                                title="Desactivar"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
-
-                      {isAdmin && (
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              onClick={() => {
-                                setTransferProductId(product.id);
-                                setShowTransferModal(true);
-                              }}
-                              className="p-2 text-slate-500 hover:text-brand bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"
-                              title="Traspasar metros a otra sucursal"
-                            >
-                              <ArrowRightLeft className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => openEditModal(product)}
-                              className="p-2 text-slate-500 hover:text-brand bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(product.id)}
-                              className="p-2 text-slate-500 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"
-                              title="Desactivar"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
                     </tr>
                   );
                 })
@@ -723,7 +750,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Modal Crear/Editar Calamina o Pack */}
+      {/* Modal Crear/Editar Repuesto */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
@@ -736,14 +763,14 @@ export default function Products() {
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-900 text-white shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-brand text-white rounded-xl shadow-xl shadow-brand/20">
-                    <Ruler className="w-6 h-6" />
+                    <Wrench className="w-6 h-6" />
                   </div>
                   <div>
                     <h3 className="text-lg font-display font-black tracking-tight uppercase">
-                      {editingProduct?.id ? 'Actualizar Calamina' : 'Registrar Nueva Calamina / Pack'}
+                      {editingProduct?.id ? 'Actualizar Repuesto' : 'Registrar Nuevo Repuesto'}
                     </h3>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-                      Especificaciones Técnicas, Color, Espesor y Metraje
+                      Código Interno, Equivalencias OEM, Marca, Proveedor y Stock Mínimo
                     </p>
                   </div>
                 </div>
@@ -756,83 +783,62 @@ export default function Products() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
-                {/* Preview & Color Selector */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <CalaminaImage product={editingProduct || {}} aspectClass="h-24 w-full" showColorDot />
-                  <div className="sm:col-span-2 space-y-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Color y Acabado Visual
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {CALAMINA_COLOR_SWATCHES.map(sw => {
-                        const active = editingProduct?.color_name === sw.name;
-                        return (
-                          <button
-                            key={sw.name}
-                            type="button"
-                            onClick={() =>
-                              setEditingProduct({
-                                ...editingProduct,
-                                color_name: sw.name,
-                                color_hex: sw.hex,
-                                image_url: sw.image,
-                              })
-                            }
-                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-2 border transition-all ${
-                              active
-                                ? 'bg-brand/10 border-brand text-brand'
-                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            <span
-                              className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
-                              style={{ backgroundColor: sw.hex }}
-                            />
-                            <span className="truncate">{sw.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Toggle Individual vs Pack */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <div>
-                    <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
-                      ¿Es un Pack de Cubierta Combinado?
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      Descuenta automáticamente el metraje de sus materiales componentes.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditingProduct({ ...editingProduct, is_combo: editingProduct?.is_combo ? 0 : 1 })
-                    }
-                    className={`px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all ${
-                      editingProduct?.is_combo
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {editingProduct?.is_combo ? 'Sí, es Pack Techo' : 'Material Individual'}
-                  </button>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Código Interno / SKU
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editingProduct?.barcode || ''}
+                      onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
+                      placeholder="Ej. EM9532"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Unidad
+                    </label>
+                    <select
+                      value={editingProduct?.unit_type || 'UNIDAD'}
+                      onChange={e => setEditingProduct({ ...editingProduct, unit_type: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white"
+                    >
+                      {TRACTOR_UNITS.map(u => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="sm:col-span-2 space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Nombre Comercial de la Calamina
+                      Nombre del Repuesto
                     </label>
                     <input
                       type="text"
                       required
                       value={editingProduct?.name || ''}
                       onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                      placeholder="Ej. Calamina Trapezoidal TR4 Azul Rey 0.40mm"
+                      placeholder="Ej. PISTON + ANILLA 100MM Ø P=38MM EMMARK"
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      OEM / Equivalencias
+                    </label>
+                    <input
+                      type="text"
+                      value={editingProduct?.oem_codes || ''}
+                      onChange={e => setEditingProduct({ ...editingProduct, oem_codes: e.target.value })}
+                      placeholder="Ej. EM9532 Fiat 450 480 540 640 8770770..."
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white"
                     />
                   </div>
 
@@ -842,11 +848,11 @@ export default function Products() {
                     </label>
                     <select
                       required
-                      value={editingProduct?.category || CALAMINA_CATEGORIES[0]}
+                      value={editingProduct?.category || TRACTOR_CATEGORIES[0]}
                       onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white"
                     >
-                      {CALAMINA_CATEGORIES.map(cat => (
+                      {TRACTOR_CATEGORIES.map(cat => (
                         <option key={cat} value={cat}>
                           {cat}
                         </option>
@@ -856,33 +862,33 @@ export default function Products() {
 
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Diseño / Perfil Laminado
+                      Marca de Tractor
                     </label>
                     <select
-                      value={editingProduct?.design_type || CALAMINA_DESIGNS[0]}
-                      onChange={e => setEditingProduct({ ...editingProduct, design_type: e.target.value })}
+                      value={editingProduct?.brand || TRACTOR_BRANDS[0]}
+                      onChange={e => setEditingProduct({ ...editingProduct, brand: e.target.value })}
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white"
                     >
-                      {CALAMINA_DESIGNS.map(d => (
-                        <option key={d} value={d}>
-                          {d}
+                      {TRACTOR_BRANDS.map(b => (
+                        <option key={b} value={b}>
+                          {b}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Espesor / Calibre
+                      Proveedor
                     </label>
                     <select
-                      value={editingProduct?.thickness || '0.35 mm'}
-                      onChange={e => setEditingProduct({ ...editingProduct, thickness: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                      value={editingProduct?.supplier_name || TRACTOR_SUPPLIERS_LIST[0]}
+                      onChange={e => setEditingProduct({ ...editingProduct, supplier_name: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white"
                     >
-                      {CALAMINA_THICKNESSES.map(t => (
-                        <option key={t} value={t}>
-                          {t}
+                      {TRACTOR_SUPPLIERS_LIST.map(s => (
+                        <option key={s} value={s}>
+                          {s}
                         </option>
                       ))}
                     </select>
@@ -890,101 +896,51 @@ export default function Products() {
 
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Código SKU / Bobina
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={editingProduct?.barcode || ''}
-                        onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
-                        placeholder="CAL-SKU"
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        value={editingProduct?.batch_number || ''}
-                        onChange={e => setEditingProduct({ ...editingProduct, batch_number: e.target.value })}
-                        placeholder="BOB-26"
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Ancho Útil (m) y Largo Base (m)
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        step="0.05"
-                        min="0.1"
-                        value={editingProduct?.width_m ?? 0.85}
-                        onChange={e =>
-                          setEditingProduct({ ...editingProduct, width_m: parseFloat(e.target.value) || 0.85 })
-                        }
-                        placeholder="Ancho (m)"
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.5"
-                        value={editingProduct?.standard_length_m ?? 3.0}
-                        onChange={e =>
-                          setEditingProduct({
-                            ...editingProduct,
-                            standard_length_m: parseFloat(e.target.value) || 3.0,
-                          })
-                        }
-                        placeholder="Largo Base (m)"
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Costo / Precio Venta por Metro (Bs/m)
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editingProduct?.cost_price ?? ''}
-                        onChange={e =>
-                          setEditingProduct({ ...editingProduct, cost_price: parseFloat(e.target.value) })
-                        }
-                        placeholder="Costo/m"
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        value={editingProduct?.price ?? ''}
-                        onChange={e => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })}
-                        placeholder="Venta/m"
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Stock Disponible Total (Metros)
+                      Precio Compra
                     </label>
                     <input
                       type="number"
-                      step="0.5"
+                      step="0.01"
+                      min="0"
+                      value={editingProduct?.cost_price ?? 0}
+                      onChange={e =>
+                        setEditingProduct({ ...editingProduct, cost_price: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Precio Venta
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
                       min="0"
                       required
-                      value={editingProduct?.stock !== undefined ? editingProduct.stock : ''}
+                      value={editingProduct?.price ?? 0}
+                      onChange={e =>
+                        setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Stock Total
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      required
+                      value={editingProduct?.stock !== undefined ? editingProduct.stock : 0}
                       onChange={e => {
-                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                        const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10));
                         setEditingProduct({ ...editingProduct, stock: isNaN(val) ? 0 : val });
                       }}
-                      placeholder="0"
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
                     />
                   </div>
@@ -992,17 +948,17 @@ export default function Products() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Stock Mínimo (m)
+                        Stock Mínimo
                       </label>
                       <span className="text-[9px] text-brand font-bold">Permite 0 (sin alerta)</span>
                     </div>
                     <input
                       type="number"
                       min="0"
-                      step="0.5"
+                      step="1"
                       value={editingProduct?.min_stock !== undefined ? editingProduct.min_stock : 0}
                       onChange={e => {
-                        const val = e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value));
+                        const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10));
                         setEditingProduct({ ...editingProduct, min_stock: isNaN(val) ? 0 : val });
                       }}
                       placeholder="0"
@@ -1012,7 +968,7 @@ export default function Products() {
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Descripción Técnica
+                      Observaciones / Descripción Técnica
                     </label>
                     <input
                       type="text"
@@ -1022,69 +978,6 @@ export default function Products() {
                     />
                   </div>
                 </div>
-
-                {/* Combo Builder */}
-                {Boolean(editingProduct?.is_combo) && (
-                  <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-500/30 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-300">
-                        Materiales que integran este Pack de Techo
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const firstProd = products.find(p => !p.is_combo);
-                          if (firstProd) {
-                            setComboComponents([...comboComponents, { product_id: firstProd.id, quantity: 1 }]);
-                          }
-                        }}
-                        className="px-3 py-1 bg-amber-600 text-white rounded text-[9px] font-black uppercase"
-                      >
-                        + Añadir Material
-                      </button>
-                    </div>
-                    {comboComponents.map((comp, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <select
-                          value={comp.product_id}
-                          onChange={e => {
-                            const updated = [...comboComponents];
-                            updated[idx].product_id = Number(e.target.value);
-                            setComboComponents(updated);
-                          }}
-                          className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-900 dark:text-white"
-                        >
-                          {products
-                            .filter(p => !p.is_combo)
-                            .map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                        </select>
-                        <input
-                          type="number"
-                          min="0.5"
-                          step="0.5"
-                          value={comp.quantity}
-                          onChange={e => {
-                            const updated = [...comboComponents];
-                            updated[idx].quantity = Math.max(0.5, parseFloat(e.target.value) || 1);
-                            setComboComponents(updated);
-                          }}
-                          className="w-20 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs font-mono font-bold text-center text-slate-900 dark:text-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setComboComponents(comboComponents.filter((_, i) => i !== idx))}
-                          className="p-2 text-rose-500 hover:bg-rose-50 rounded"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 <div className="pt-4 flex gap-3">
                   <button
@@ -1099,7 +992,7 @@ export default function Products() {
                     className="flex-1 py-3.5 bg-brand text-white font-display font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-lg flex items-center justify-center gap-2"
                   >
                     <Save className="w-4 h-4" />
-                    Guardar Calamina
+                    Guardar Repuesto
                   </button>
                 </div>
               </form>
@@ -1117,10 +1010,10 @@ export default function Products() {
                 <Barcode className="w-5 h-5 text-brand" />
                 <div>
                   <h3 className="font-display font-black uppercase tracking-wider text-sm">
-                    Etiquetas de Identificación de Bobinas y Planchas
+                    Etiquetas de Identificación de Repuestos
                   </h3>
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest">
-                    Seleccione las calaminas e imprima planilla para almacén
+                    Seleccione los repuestos e imprima planilla para estantería de almacén
                   </p>
                 </div>
               </div>
@@ -1140,7 +1033,7 @@ export default function Products() {
 
             <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
               <div className="flex flex-wrap gap-2">
-                {products.map(p => {
+                {products.slice(0, 30).map(p => {
                   const selected = selectedForLabels.includes(p.id);
                   return (
                     <button
@@ -1157,7 +1050,7 @@ export default function Products() {
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
                       }`}
                     >
-                      {p.name}
+                      [{p.barcode || p.id}] {p.name.slice(0, 28)}
                     </button>
                   );
                 })}
@@ -1171,17 +1064,17 @@ export default function Products() {
                       key={p.id}
                       className="p-4 bg-white text-slate-900 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center text-center space-y-1.5"
                     >
-                      <p className="text-[9px] font-black uppercase tracking-widest text-brand">ACERTECHO PRO</p>
-                      <p className="text-[11px] font-black uppercase truncate w-full">{p.name}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-brand">AGROPARTES PRO</p>
+                      <p className="text-[11px] font-black uppercase line-clamp-2 w-full leading-tight">{p.name}</p>
                       <p className="text-[9px] font-mono text-slate-500">
-                        {p.thickness || '0.35 mm'} · {p.color_name || 'Galv.'}
+                        {p.brand || 'GENERAL'} · {p.category}
                       </p>
                       <div className="w-full py-1 text-slate-900">
-                        <BarcodeSVG value={p.barcode || `CAL-${String(p.id).padStart(6, '0')}`} />
+                        <BarcodeSVG value={p.barcode || `REP-${String(p.id).padStart(4, '0')}`} />
                       </div>
                       <div className="flex items-center justify-between w-full pt-1 border-t border-slate-100 text-[10px] font-mono">
-                        <span className="text-slate-500">{p.batch_number || 'BOB-26'}</span>
-                        <span className="font-black text-xs">{formatPrice(p.price)}/m</span>
+                        <span className="text-slate-500 truncate max-w-[90px]">{p.supplier_name || 'OEM'}</span>
+                        <span className="font-black text-xs">{formatPrice(p.price)}</span>
                       </div>
                     </div>
                   ))}

@@ -41,7 +41,7 @@ export default function AIChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: '¡Bienvenido a **AcerTecho Pro**! Soy tu asistente comercial para gestión de calaminas por medición. Estoy conectado a tu inventario de metros lineales, sucursales y ventas en tiempo real. ¿Analizamos stock o ventas de hoy?' }
+    { role: 'model', text: '¡Bienvenido a **AgroPartes Pro**! Soy tu asistente comercial para repuestos de tractores agrícolas y maquinaria (New Holland, Massey Ferguson, Fiat, Valmet Valtra). Estoy conectado al catálogo OEM, stock por sucursal y ventas en tiempo real. ¿Revisamos stock crítico o ventas de hoy?' }
   ]);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -52,8 +52,8 @@ export default function AIChat() {
 
   const quickPrompts = [
     { label: 'Analizar Ventas', icon: TrendingUp, text: '¿Cómo van las ventas totales y cuál es el rendimiento del equipo?' },
-    { label: 'Stock Crítico', icon: Package, text: '¿Qué productos tienen stock bajo y necesitan reposición urgente?' },
-    { label: 'Reporte PDF', icon: FileText, text: 'Genera un reporte PDF detallado con el estado actual del negocio.' },
+    { label: 'Stock Crítico', icon: Package, text: '¿Qué repuestos tienen stock bajo o agotado y necesitan reposición urgente?' },
+    { label: 'Reporte PDF', icon: FileText, text: 'Genera un reporte PDF detallado con el estado actual del inventario y ventas.' },
     { label: 'Exportar Excel', icon: FileDown, text: 'Necesito descargar el historial detallado de ventas en formato Excel.' },
   ];
 
@@ -70,7 +70,7 @@ export default function AIChat() {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Ventas");
-    XLSX.writeFile(workbook, `Reporte_Ventas_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(workbook, `Reporte_Ventas_AgroPartes_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const generatePDF = (type: 'users' | 'sales' | 'products' | 'general', context: any) => {
@@ -83,11 +83,11 @@ export default function AIChat() {
     doc.setFontSize(22);
     doc.setTextColor(20, 20, 20);
     doc.setFont("helvetica", "bold");
-    doc.text("Reporte de Gestión AcerTecho Pro", 105, 20, { align: 'center' });
+    doc.text("Reporte de Gestión AgroPartes Pro", 105, 20, { align: 'center' });
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text("Sistema Comercial Digital", 20, 35);
+    doc.text("AgroPartes Tractores S.R.L. · Catálogo OEM y Maquinaria Agrícola", 20, 35);
     doc.setDrawColor(200);
     doc.line(20, 37, 190, 37);
     
@@ -108,7 +108,7 @@ export default function AIChat() {
         head: headers,
         body: body,
         theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255] },
+        headStyles: { fillColor: [194, 65, 12], textColor: [255, 255, 255] },
         styles: { fontSize: 8 },
         margin: { left: 20, right: 20 }
       });
@@ -117,8 +117,15 @@ export default function AIChat() {
     };
 
     if (type === 'products' || type === 'general') {
-      const body = context.products.map((p: any) => [p.name, p.category, `${currency.symbol} ${p.price}`, p.stock]);
-      addSection("Estado de Inventario", [["PRODUCTO", "CATEGORÍA", "PRECIO", "STOCK"]], body);
+      const body = context.products.map((p: any) => [
+        p.barcode || `REP-${p.id}`,
+        p.name,
+        p.brand || 'GENERAL',
+        p.category,
+        `${currency.symbol} ${p.price}`,
+        p.stock
+      ]);
+      addSection("Estado de Inventario de Repuestos", [["CÓDIGO", "REPUESTO", "MARCA", "CAT.", "PRECIO", "STOCK"]], body);
     }
 
     if (type === 'sales' || type === 'general') {
@@ -131,7 +138,7 @@ export default function AIChat() {
       addSection("Personal Autorizado", [["USUARIO", "NOMBRE", "ROL"]], body);
     }
 
-    doc.save(`AcerTecho_Reporte_${type}_${new Date().getTime()}.pdf`);
+    doc.save(`AgroPartes_Reporte_${type}_${new Date().getTime()}.pdf`);
   };
 
   const handleSend = async (customPrompt?: string) => {
@@ -148,16 +155,16 @@ export default function AIChat() {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const systemInstruction = `
-        Eres el "Asistente Comercial" de AcerTecho Calaminas S.R.L., empresa especializada en venta de calaminas y cubiertas por medición lineal (metros). 
+        Eres el "Asistente Comercial Técnico" de AgroPartes Tractores S.R.L., empresa especializada en venta de repuestos de tractores agrícolas y maquinaria pesada (New Holland, Massey Ferguson, Fiat, Valmet Valtra, Universal) con códigos OEM y equivalencias. 
         TONO: Profesional, estratégico, proactivo.
-        OBJETIVO: Ayudar a ${user?.full_name} (${user?.role}) a optimizar el negocio.
+        OBJETIVO: Ayudar a ${user?.full_name} (${user?.role}) a optimizar el inventario y ventas de repuestos.
 
         ESTADÍSTICAS REALES:
         - Moneda local: ${systemContext.systemInfo.currency}
         - Total Ventas: ${systemContext.totalStats.count}
         - Ingresos Totales: ${systemContext.systemInfo.currency} ${systemContext.totalStats.revenue.toFixed(2)}
         
-        INVENTARIO: ${JSON.stringify(systemContext.products)}
+        INVENTARIO DE REPUESTOS: ${JSON.stringify(systemContext.products)}
         PERSONAL: ${JSON.stringify(systemContext.users)}
         VENTAS RECIENTES: ${JSON.stringify(systemContext.detailedSales)}
         
@@ -168,9 +175,8 @@ export default function AIChat() {
         
         REGLAS DE RESPUESTA:
         1. Responde SIEMPRE en español.
-        2. Usa Markdown denso (**negritas**, listas).
-        3. Integra emojis estratégicamente.
-        4. Sé analítico: si ves stock bajo o ventas cayendo, menciónalo.
+        2. Usa Markdown claro (**negritas**, listas) e incluye códigos internos/OEM y marca de tractor cuando recomiendes repuestos.
+        3. Sé analítico: recuerda que si stock_minimo es 0 no cuenta como alerta de reposición, pero stock <= 0 sí indica sin stock si el producto es de alta rotación.
       `;
 
       const chat = ai.chats.create({

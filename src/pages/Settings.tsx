@@ -76,7 +76,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `acertecho_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `agropartes_backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -116,7 +116,7 @@ export default function Settings() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre de la Empresa</label>
-              <input type="text" defaultValue="AcerTecho Calaminas S.R.L." className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand outline-none text-slate-900 dark:text-white" />
+              <input type="text" defaultValue="AgroPartes Tractores S.R.L." className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand outline-none text-slate-900 dark:text-white" />
             </div>
             
             <div>
@@ -249,20 +249,20 @@ export default function Settings() {
                 if (!confirm('¿Cargar datos de demostración? Esto añadirá productos, clientes y ventas de prueba.')) return;
                 try {
                   setDbStatus('checking');
-                  // 1. Seed Products
+                  // 1. Seed Tractor Spare Parts Products
                   const products = [
-                    { name: 'Calamina Ondulada Zinc Galvanizada 0.35mm', description: 'Plancha galvanizada estándar por metro lineal', price: 42, stock: 600, category: 'Calamina Ondulada' },
-                    { name: 'Calamina Teja Colonial Rojo Terracota 0.40mm', description: 'Acabado colonial prepintado rojo teja', price: 68, stock: 340, category: 'Calamina Teja Colonial' },
-                    { name: 'Calamina Trapezoidal Azul Rey TR4 0.45mm', description: 'Perfil estructural TR4 azul rey', price: 62, stock: 280, category: 'Calamina Trapezoidal' },
+                    { name: 'BOMBA DE AGUA MF 290/292 MOTOR PERKINS', barcode: '02427', oem_codes: 'U5MW0104 / 41313201', brand: 'MASSEY FERGUSON', unit_type: 'UNIDAD', supplier_name: 'IMPORTADORA AGRO SUR', cost_price: 210, price: 320, stock: 12, min_stock: 0, category: 'REFRIGERACION' },
+                    { name: 'DISCO DE EMBRAGUE 12 PULGADAS VALMET/VALTRA', barcode: '05601', oem_codes: '80224900 / 228014', brand: 'VALMET VALTRA', unit_type: 'UNIDAD', supplier_name: 'TRACTOREPUESTOS S.R.L.', cost_price: 380, price: 540, stock: 8, min_stock: 2, category: 'EMBRAGUE Y TRANSMISION' },
+                    { name: 'FILTRO HIDRAULICO NEW HOLLAND TL/TM', barcode: '13430', oem_codes: '84226258 / 5174044', brand: 'NEW HOLLAND', unit_type: 'UNIDAD', supplier_name: 'AGRO DIESEL LTDA.', cost_price: 85, price: 135, stock: 24, min_stock: 4, category: 'SISTEMA HIDRAULICO' },
                   ];
                   
                   for(const p of products) await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(p) });
 
-                  // 2. Seed Customers
+                  // 2. Seed Workshop & Estancia Customers
                   const customers = [
-                    { name: 'Constructora Horizonte S.R.L.', email: 'obras@horizonte.com', phone: '71023456', address: 'Av. Cristo Redentor Km 6' },
-                    { name: 'Arq. Carlos Mendoza', email: 'cmendoza@estudio.bo', phone: '76543210', address: 'Equipetrol Norte' },
-                    { name: 'Soporte AcerTecho', email: 'ventas@acertecho.com', phone: '33445566', address: 'Parque Industrial Norte' }
+                    { name: 'Estancia Agrícola El Dorado', email: 'compras@eldoradoagro.bo', phone: '71023456', address: 'Carretera al Norte Km 32' },
+                    { name: 'Taller Mecánico El Tractor', email: 'taller@eltractor.bo', phone: '76543210', address: 'Av. Doble Vía La Guardia Km 7' },
+                    { name: 'Cooperativa Agrícola San Julián', email: 'repuestos@coopsanjulian.bo', phone: '33445566', address: 'San Julián - Santa Cruz' }
                   ];
                   for(const c of customers) await apiFetch('/api/customers', { method: 'POST', body: JSON.stringify(c) });
 
@@ -274,7 +274,7 @@ export default function Settings() {
                       date.setDate(date.getDate() - i);
                       const sale = {
                         customer_id: 1,
-                        client_name: 'Juan Pérez',
+                        client_name: 'Estancia Agrícola El Dorado',
                         items: [{
                           product_id: fetchedProducts[0].id,
                           name: fetchedProducts[0].name,
@@ -283,7 +283,7 @@ export default function Settings() {
                           total: fetchedProducts[0].price
                         }],
                         total: fetchedProducts[0].price,
-                        payment_method: 'Efectivo',
+                        payment_method: 'CASH',
                         created_at: date.toISOString()
                       };
                       await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(sale) });

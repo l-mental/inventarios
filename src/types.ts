@@ -17,6 +17,9 @@ export interface Product {
   min_stock?: number;
   branch_stocks?: Record<string, number>;
   category: string;
+  brand?: string;
+  oem_codes?: string;
+  supplier_name?: string;
   barcode?: string;
   batch_number?: string;
   expiry_date?: string;
@@ -29,7 +32,7 @@ export interface Product {
   thickness?: string;
   width_m?: number;
   standard_length_m?: number;
-  unit_type?: 'm' | 'm2' | 'unidad';
+  unit_type?: string;
 }
 
 export interface Customer {

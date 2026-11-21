@@ -3,13 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useApi } from '../hooks/useApi';
 import { Customer, Product, CashSession, Quotation } from '../types';
-import CalaminaImage from '../components/CalaminaImage';
 import {
-  CALAMINA_CATEGORIES,
-  CALAMINA_COLOR_SWATCHES,
-  STANDARD_CUT_LENGTHS,
-  formatMeter,
-} from '../lib/calaminaCatalog';
+  TRACTOR_CATEGORIES,
+  TRACTOR_BRANDS,
+  getStockStatus,
+  getBrandAccent,
+} from '../data/tractorPartsCatalog';
 import {
   ShoppingCart,
   Search,
@@ -18,7 +17,6 @@ import {
   Trash2,
   CheckCircle2,
   User as UserIcon,
-  Package,
   QrCode,
   Upload,
   X,
@@ -35,18 +33,13 @@ import {
   ArrowDownLeft,
   Copy,
   Check,
-  Layers,
-  Ruler,
-  Calculator,
+  Wrench,
 } from 'lucide-react';
 
 interface CartItem {
   cartKey: string;
   product: Product;
-  quantity: number; // Metros lineales totales
-  sheet_length_m?: number;
-  sheet_count?: number;
-  measurement_summary?: string;
+  quantity: number;
 }
 
 export default function POS() {
@@ -57,20 +50,9 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
-  const [selectedColor, setSelectedColor] = useState<string>('Todos');
+  const [selectedBrand, setSelectedBrand] = useState<string>('Todos');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Measurement & Cut Calculator Modal
-  const [measureProduct, setMeasureProduct] = useState<Product | null>(null);
-  const [editingCartKey, setEditingCartKey] = useState<string | null>(null);
-  const [measureMode, setMeasureMode] = useState<'sheets' | 'direct'>('sheets');
-  const [sheetLength, setSheetLength] = useState<number>(3.0);
-  const [sheetCount, setSheetCount] = useState<number>(1);
-  const [directMeters, setDirectMeters] = useState<number>(3.0);
-  const [showAreaHelper, setShowAreaHelper] = useState(false);
-  const [roofWidth, setRoofWidth] = useState<string>('6');
-  const [roofDropLength, setRoofDropLength] = useState<string>('3.6');
 
   // Payment methods: CASH, QR, MIXED, CREDIT
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'QR' | 'MIXED' | 'CREDIT'>('CASH');
@@ -103,7 +85,7 @@ export default function POS() {
     type: 'VENTA' | 'PROFORMA';
     customerName: string;
     phone: string;
-    items: { name: string; quantity: number; price: number; measurement_summary?: string }[];
+    items: { name: string; code?: string; unit?: string; quantity: number; price: number }[];
     subtotal: number;
     discount: number;
     total: number;
@@ -159,166 +141,57 @@ export default function POS() {
   }, [selectedCustomerId]);
 
   const filteredProducts = products.filter(p => {
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     const matchesSearch =
+      !q ||
       p.name.toLowerCase().includes(q) ||
       p.category.toLowerCase().includes(q) ||
-      (p.color_name && p.color_name.toLowerCase().includes(q)) ||
-      (p.design_type && p.design_type.toLowerCase().includes(q)) ||
-      (p.barcode && p.barcode.toLowerCase().includes(q));
+      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+      (p.oem_codes && p.oem_codes.toLowerCase().includes(q)) ||
+      (p.brand && p.brand.toLowerCase().includes(q)) ||
+      (p.supplier_name && p.supplier_name.toLowerCase().includes(q));
     const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
-    const matchesColor = selectedColor === 'Todos' || p.color_name === selectedColor;
-    return matchesSearch && matchesCategory && matchesColor;
+    const matchesBrand = selectedBrand === 'Todos' || (p.brand || 'GENERAL') === selectedBrand;
+    return matchesSearch && matchesCategory && matchesBrand;
   });
 
-  const openMeasurementModal = (product: Product, existingItem?: CartItem) => {
+  const addProductToCart = (product: Product) => {
     if (product.stock <= 0) {
-      setMessage({ type: 'error', text: `El material ${product.name} no tiene stock disponible.` });
-      return;
-    }
-    setMeasureProduct(product);
-    setShowAreaHelper(false);
-    if (existingItem) {
-      setEditingCartKey(existingItem.cartKey);
-      if (existingItem.sheet_length_m && existingItem.sheet_count) {
-        setMeasureMode('sheets');
-        setSheetLength(existingItem.sheet_length_m);
-        setSheetCount(existingItem.sheet_count);
-        setDirectMeters(existingItem.quantity);
-      } else {
-        setMeasureMode('direct');
-        setDirectMeters(existingItem.quantity);
-        setSheetLength(product.standard_length_m || 3.0);
-        setSheetCount(1);
-      }
-    } else {
-      setEditingCartKey(null);
-      setMeasureMode('sheets');
-      const defLen = product.standard_length_m || 3.0;
-      setSheetLength(defLen);
-      setSheetCount(1);
-      setDirectMeters(defLen);
-    }
-  };
-
-  const applyRoofAreaCalculation = () => {
-    if (!measureProduct) return;
-    const w = Math.max(0.5, parseFloat(roofWidth) || 1);
-    const d = Math.max(0.5, parseFloat(roofDropLength) || 1);
-    const usableW = measureProduct.width_m || 0.85;
-    const neededSheets = Math.max(1, Math.ceil(w / usableW));
-    setMeasureMode('sheets');
-    setSheetLength(Number(d.toFixed(2)));
-    setSheetCount(neededSheets);
-  };
-
-  const computedTotalMeters =
-    measureMode === 'sheets'
-      ? Number((Math.max(0.1, sheetLength) * Math.max(1, sheetCount)).toFixed(2))
-      : Number(Math.max(0.1, directMeters).toFixed(2));
-
-  const computedAreaM2 = measureProduct
-    ? Number((computedTotalMeters * (measureProduct.width_m || 0.85)).toFixed(2))
-    : 0;
-
-  const confirmMeasurementToCart = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!measureProduct) return;
-
-    const totalMeters = computedTotalMeters;
-    const otherCartMeters = cart
-      .filter(i => i.product.id === measureProduct.id && i.cartKey !== editingCartKey)
-      .reduce((sum, i) => sum + i.quantity, 0);
-
-    if (totalMeters + otherCartMeters > measureProduct.stock + 0.001) {
-      setMessage({
-        type: 'error',
-        text: `Stock insuficiente de ${measureProduct.name}. Disponible: ${formatMeter(measureProduct.stock - otherCartMeters)}.`,
-      });
+      setMessage({ type: 'error', text: `El repuesto [${product.barcode || product.id}] ${product.name} no tiene stock disponible.` });
       return;
     }
 
-    const summary =
-      measureMode === 'sheets'
-        ? `${sheetCount} pl × ${sheetLength.toFixed(2)} m = ${totalMeters.toFixed(2)} m (${computedAreaM2.toFixed(2)} m²)`
-        : `Corte directo: ${totalMeters.toFixed(2)} m (${computedAreaM2.toFixed(2)} m²)`;
-
-    const targetKey =
-      measureMode === 'sheets'
-        ? `${measureProduct.id}-L${sheetLength.toFixed(2)}`
-        : `${measureProduct.id}-DIRECT`;
-
-    const newItem: CartItem = {
-      cartKey: targetKey,
-      product: measureProduct,
-      quantity: totalMeters,
-      sheet_length_m: measureMode === 'sheets' ? sheetLength : undefined,
-      sheet_count: measureMode === 'sheets' ? sheetCount : undefined,
-      measurement_summary: summary,
-    };
-
+    const cartKey = String(product.id);
     setCart(prev => {
-      if (editingCartKey) {
-        return prev.map(item => (item.cartKey === editingCartKey ? newItem : item));
-      }
-      const existing = prev.find(i => i.cartKey === targetKey);
+      const existing = prev.find(i => i.cartKey === cartKey);
       if (existing) {
-        const mergedMeters = Number((existing.quantity + totalMeters).toFixed(2));
-        const mergedCount =
-          existing.sheet_count && newItem.sheet_count
-            ? existing.sheet_count + newItem.sheet_count
-            : undefined;
-        const mergedArea = Number((mergedMeters * (measureProduct.width_m || 0.85)).toFixed(2));
-        const mergedSummary =
-          mergedCount && newItem.sheet_length_m
-            ? `${mergedCount} pl × ${newItem.sheet_length_m.toFixed(2)} m = ${mergedMeters.toFixed(2)} m (${mergedArea.toFixed(2)} m²)`
-            : `Corte directo: ${mergedMeters.toFixed(2)} m (${mergedArea.toFixed(2)} m²)`;
+        if (existing.quantity + 1 > product.stock) {
+          setMessage({
+            type: 'error',
+            text: `Stock máximo alcanzado para ${product.name} (${product.stock} ${product.unit_type || 'UNIDAD'}).`,
+          });
+          return prev;
+        }
         return prev.map(i =>
-          i.cartKey === targetKey
-            ? { ...i, quantity: mergedMeters, sheet_count: mergedCount, measurement_summary: mergedSummary }
-            : i
+          i.cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, newItem];
+      return [...prev, { cartKey, product, quantity: 1 }];
     });
-
-    setMeasureProduct(null);
-    setEditingCartKey(null);
   };
 
-  const adjustCartItemBySheet = (cartKey: string, deltaDirection: 1 | -1) => {
+  const updateCartQuantity = (cartKey: string, nextQty: number) => {
     setCart(prev =>
       prev.map(item => {
         if (item.cartKey !== cartKey) return item;
-        const step = item.sheet_length_m || 1;
-        const newQty = Number((item.quantity + deltaDirection * step).toFixed(2));
-        if (newQty <= 0.05) return item;
-
-        const otherMeters = prev
-          .filter(i => i.product.id === item.product.id && i.cartKey !== cartKey)
-          .reduce((s, i) => s + i.quantity, 0);
-
-        if (newQty + otherMeters > item.product.stock + 0.001) {
+        const clamped = Math.max(1, Math.min(item.product.stock, Math.round(nextQty) || 1));
+        if (nextQty > item.product.stock) {
           setMessage({
             type: 'error',
-            text: `Stock insuficiente para ${item.product.name}. Disponible: ${formatMeter(item.product.stock - otherMeters)}.`,
+            text: `Stock disponible máximo de ${item.product.name}: ${item.product.stock}.`,
           });
-          return item;
         }
-
-        const newCount = item.sheet_count ? Math.max(1, item.sheet_count + deltaDirection) : undefined;
-        const area = Number((newQty * (item.product.width_m || 0.85)).toFixed(2));
-        const summary =
-          newCount && item.sheet_length_m
-            ? `${newCount} pl × ${item.sheet_length_m.toFixed(2)} m = ${newQty.toFixed(2)} m (${area.toFixed(2)} m²)`
-            : `Corte directo: ${newQty.toFixed(2)} m (${area.toFixed(2)} m²)`;
-
-        return {
-          ...item,
-          quantity: newQty,
-          sheet_count: newCount,
-          measurement_summary: summary,
-        };
+        return { ...item, quantity: clamped };
       })
     );
   };
@@ -328,10 +201,7 @@ export default function POS() {
   };
 
   const subtotal = Number(cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0).toFixed(2));
-  const totalCartMeters = Number(cart.reduce((acc, item) => acc + item.quantity, 0).toFixed(2));
-  const totalCartArea = Number(
-    cart.reduce((acc, item) => acc + item.quantity * (item.product.width_m || 0.85), 0).toFixed(2)
-  );
+  const totalCartUnits = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   const availablePoints = selectedCustomer?.points || 0;
   const maxRedeemablePoints = Math.min(availablePoints - (availablePoints % 10), Math.floor((subtotal * 0.5) / 5) * 10);
@@ -348,7 +218,7 @@ export default function POS() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (paymentMethod === 'CREDIT' && !selectedCustomerId) {
-      setMessage({ type: 'error', text: 'Seleccione un cliente registrado para habilitar venta al crédito (Fiado).' });
+      setMessage({ type: 'error', text: 'Seleccione un cliente o taller registrado para habilitar venta al crédito.' });
       return;
     }
 
@@ -363,9 +233,7 @@ export default function POS() {
             id: item.product.id,
             quantity: item.quantity,
             price: item.product.price,
-            sheet_length_m: item.sheet_length_m,
-            sheet_count: item.sheet_count,
-            measurement_summary: item.measurement_summary,
+            measurement_summary: `${item.quantity} ${item.product.unit_type || 'UNIDAD'} · Cód ${item.product.barcode || item.product.id}`,
           })),
           total,
           customer_id: selectedCustomerId,
@@ -401,9 +269,10 @@ export default function POS() {
         phone: custPhone,
         items: cart.map(i => ({
           name: i.product.name,
+          code: i.product.barcode || String(i.product.id),
+          unit: i.product.unit_type || 'UNIDAD',
           quantity: i.quantity,
           price: i.product.price,
-          measurement_summary: i.measurement_summary,
         })),
         subtotal,
         discount: discountAmount,
@@ -416,7 +285,7 @@ export default function POS() {
         type: 'success',
         text: response.offline
           ? 'Venta guardada localmente. Se sincronizará al recuperar internet.'
-          : 'Orden de corte y venta procesada exitosamente.',
+          : 'Venta procesada y stock actualizado exitosamente.',
       });
       if (!response.offline) fetchAllData();
 
@@ -449,13 +318,11 @@ export default function POS() {
             id: i.product.id,
             quantity: i.quantity,
             price: i.product.price,
-            sheet_length_m: i.sheet_length_m,
-            sheet_count: i.sheet_count,
-            measurement_summary: i.measurement_summary,
+            measurement_summary: `${i.quantity} ${i.product.unit_type || 'UNIDAD'}`,
           })),
           total,
           valid_until: validUntil,
-          notes: `Proforma por medición (${totalCartMeters.toFixed(2)} m lineales / ${totalCartArea.toFixed(2)} m²)`,
+          notes: `Proforma de repuestos (${totalCartUnits} unidades)`,
         }),
       });
 
@@ -469,14 +336,15 @@ export default function POS() {
         phone: custPhone,
         items: cart.map(i => ({
           name: i.product.name,
+          code: i.product.barcode || String(i.product.id),
+          unit: i.product.unit_type || 'UNIDAD',
           quantity: i.quantity,
           price: i.product.price,
-          measurement_summary: i.measurement_summary,
         })),
         subtotal,
         discount: discountAmount,
         total,
-        paymentMethod: 'PROFORMA POR MEDICIÓN (VÁLIDA 7 DÍAS)',
+        paymentMethod: 'PROFORMA REPUESTOS (VÁLIDA 7 DÍAS)',
       });
 
       setCart([]);
@@ -497,14 +365,9 @@ export default function POS() {
       if (prod && prod.stock > 0) {
         const qty = Math.min(d.quantity, prod.stock);
         loadedCart.push({
-          cartKey: `${prod.id}-${d.sheet_length_m ? `L${d.sheet_length_m.toFixed(2)}` : 'DIRECT'}`,
+          cartKey: String(prod.id),
           product: prod,
           quantity: qty,
-          sheet_length_m: d.sheet_length_m,
-          sheet_count: d.sheet_count,
-          measurement_summary:
-            d.measurement_summary ||
-            `${qty.toFixed(2)} m (${(qty * (prod.width_m || 0.85)).toFixed(2)} m²)`,
         });
       }
     }
@@ -598,7 +461,7 @@ export default function POS() {
 
   const buildReceiptText = () => {
     if (!lastReceipt) return '';
-    const company = settings.company_name || 'AcerTecho Calaminas S.R.L.';
+    const company = settings.company_name || 'AgroPartes Tractores S.R.L.';
     const lines = [
       `*${company.toUpperCase()} - COMPROBANTE DE ${lastReceipt.type}*`,
       `Nro: #${lastReceipt.type === 'VENTA' ? 'VEN' : 'PRO'}-${String(lastReceipt.id).padStart(5, '0')}`,
@@ -607,7 +470,7 @@ export default function POS() {
       `--------------------------------`,
       ...lastReceipt.items.map(
         i =>
-          `• ${i.name}\n  ${i.measurement_summary ? i.measurement_summary : `${i.quantity} m`} — ${formatPrice(i.quantity * i.price)}`
+          `• [${i.code || '-'}] ${i.name}\n  ${i.quantity} ${i.unit || 'UNIDAD'} × ${formatPrice(i.price)} = ${formatPrice(i.quantity * i.price)}`
       ),
       `--------------------------------`,
       lastReceipt.discount > 0
@@ -618,7 +481,7 @@ export default function POS() {
       lastReceipt.creditBalance && lastReceipt.creditBalance > 0
         ? `*Saldo Pendiente (Crédito): ${formatPrice(lastReceipt.creditBalance)}*`
         : '',
-      `¡Gracias por construir con nosotros!`,
+      `¡Gracias por su preferencia!`,
     ].filter(Boolean);
     return lines.join('\n');
   };
@@ -664,7 +527,7 @@ export default function POS() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowQuotationsModal(true)}
-            className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all"
+            className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap"
           >
             <FileText className="w-4 h-4 text-brand" />
             Proformas ({quotations.filter(q => q.status === 'PENDING').length})
@@ -675,7 +538,7 @@ export default function POS() {
               if (cashSession) setClosingInput(String(cashSession.expected_amount));
               setShowCashModal(true);
             }}
-            className={`px-4 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm ${
+            className={`px-4 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm whitespace-nowrap ${
               cashSession
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                 : 'bg-rose-600 hover:bg-rose-500 text-white'
@@ -690,134 +553,134 @@ export default function POS() {
       <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-12.5rem)] lg:overflow-hidden">
         {/* Products Section */}
         <div className="flex-[1.5] flex flex-col gap-4 min-w-0 h-auto lg:h-full">
-          {/* Search & Color/Category Filter Bar */}
+          {/* Search & Brand/Category Filter Bar */}
           <div className="tech-card p-3.5 space-y-3">
-            <div className="relative group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand/50 group-focus-within:text-brand w-4 h-4 transition-colors" />
-              <input
-                type="text"
-                placeholder="Buscar calamina por diseño, color, espesor o código..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-brand text-slate-900 dark:text-white font-semibold text-xs placeholder:text-slate-400"
-              />
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand/50 group-focus-within:text-brand w-4 h-4 transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Buscar por código interno, OEM (ej. EM9532, Perkins), repuesto o proveedor..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-brand text-slate-900 dark:text-white font-semibold text-xs placeholder:text-slate-400"
+                />
+              </div>
+              <select
+                value={selectedCategory}
+                onChange={e => setSelectedCategory(e.target.value)}
+                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold uppercase text-slate-900 dark:text-white outline-none focus:border-brand"
+              >
+                <option value="Todos">Todas las Categorías</option>
+                {TRACTOR_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* Design / Category Filters */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {['Todos', ...CALAMINA_CATEGORIES.slice(0, 6)].map(cat => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all border ${
-                      selectedCategory === cat
-                        ? 'bg-brand text-white border-brand shadow-sm'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand/40'
-                    }`}
-                  >
-                    {cat.replace('Calamina ', '')}
-                  </button>
-                ))}
-              </div>
-
-              {/* Color Swatch Filter */}
-              <div className="flex items-center gap-1.5">
+            {/* Brand Quick Filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {['Todos', ...TRACTOR_BRANDS].map(brand => (
                 <button
+                  key={brand}
                   type="button"
-                  onClick={() => setSelectedColor('Todos')}
-                  className={`px-2 py-1 rounded text-[10px] font-bold uppercase border transition-all ${
-                    selectedColor === 'Todos'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
-                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                  onClick={() => setSelectedBrand(brand)}
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all border whitespace-nowrap ${
+                    selectedBrand === brand
+                      ? 'bg-brand text-white border-brand shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand/40'
                   }`}
                 >
-                  Todos los colores
+                  {brand}
                 </button>
-                {CALAMINA_COLOR_SWATCHES.map(sw => (
-                  <button
-                    key={sw.name}
-                    type="button"
-                    onClick={() => setSelectedColor(selectedColor === sw.name ? 'Todos' : sw.name)}
-                    title={sw.name}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform flex items-center justify-center ${
-                      selectedColor === sw.name
-                        ? 'scale-110 border-brand ring-2 ring-brand/30'
-                        : 'border-white dark:border-slate-700 hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: sw.hex }}
-                  />
-                ))}
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Visual Calamina Grid */}
+          {/* Spare Parts Grid */}
           <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar min-h-[400px] lg:min-h-0">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
-              {filteredProducts.map(product => (
-                <button
-                  key={product.id}
-                  onClick={() => openMeasurementModal(product)}
-                  disabled={product.stock <= 0}
-                  className={`tech-grid-item group flex flex-col p-3.5 text-left transition-all relative rounded-xl border border-slate-200/80 dark:border-slate-800 ${
-                    product.stock <= 0 ? 'opacity-50 grayscale' : 'hover:border-brand/50 active:scale-[0.99]'
-                  }`}
-                >
-                  <div className="relative mb-3 w-full">
-                    <CalaminaImage product={product} aspectClass="h-28 w-full" showColorDot />
-                    <div className="absolute top-2 right-2 bg-slate-950/85 backdrop-blur-sm text-white px-2 py-0.5 rounded text-[10px] font-mono font-bold tabular-nums">
-                      {formatMeter(product.stock)}
-                    </div>
-                    {product.is_combo ? (
-                      <div className="absolute bottom-2 left-2 bg-amber-600 text-white px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        Pack Techo
-                      </div>
-                    ) : null}
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 pb-4">
+              {filteredProducts.map(product => {
+                const stockStatus = getStockStatus(product);
+                const brandStyle = getBrandAccent(product.brand);
 
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    <span>{product.color_name || 'Galvanizado'}</span>
-                    <span>·</span>
-                    <span className="font-mono">{product.thickness || '0.35 mm'}</span>
-                    <span>·</span>
-                    <span className="font-mono">Ancho {product.width_m || 0.85}m</span>
-                  </div>
-
-                  <h4 className="font-display font-extrabold text-sm text-slate-900 dark:text-white mb-3 line-clamp-2 w-full group-hover:text-brand transition-colors tracking-tight leading-snug">
-                    {product.name}
-                  </h4>
-
-                  <div className="mt-auto pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between w-full">
-                    <div>
-                      <p className="text-lg font-display font-black text-slate-900 dark:text-white tabular-nums group-hover:text-brand transition-colors tracking-tight leading-none">
-                        {formatPrice(product.price)}
-                        <span className="text-[11px] font-bold text-slate-400 ml-1">/ m</span>
-                      </p>
-                    </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand/10 text-brand rounded-md text-[10px] font-black uppercase tracking-wider group-hover:bg-brand group-hover:text-white transition-colors">
-                      <Ruler className="w-3 h-3" />
-                      Medir
-                    </span>
-                  </div>
-
-                  {product.stock <= 0 && (
-                    <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px] flex items-center justify-center z-20 rounded-xl">
-                      <span className="bg-rose-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded tracking-wider shadow-lg">
-                        Sin Metraje
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => addProductToCart(product)}
+                    disabled={product.stock <= 0}
+                    className={`tech-grid-item group flex flex-col p-4 text-left transition-all relative rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 ${
+                      product.stock <= 0 ? 'opacity-60' : 'hover:border-brand/60 active:scale-[0.99]'
+                    }`}
+                  >
+                    {/* Header: Code + Brand + Stock Status */}
+                    <div className="flex items-center justify-between gap-2 w-full mb-2">
+                      <span className="font-mono font-black text-xs text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                        {product.barcode || `REP-${product.id}`}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded border text-[9px] font-black uppercase ${brandStyle.bg} ${brandStyle.text} ${brandStyle.border}`}
+                      >
+                        {product.brand || 'GENERAL'}
                       </span>
                     </div>
-                  )}
-                </button>
-              ))}
+
+                    {/* Product Name */}
+                    <h4 className="font-display font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white mb-1.5 line-clamp-2 w-full group-hover:text-brand transition-colors tracking-tight leading-snug">
+                      {product.name}
+                    </h4>
+
+                    {/* Metadata line: Category · Unit · Supplier */}
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1.5 truncate w-full">
+                      <span>{product.category}</span>
+                      <span className="mx-1">·</span>
+                      <span>{product.unit_type || 'UNIDAD'}</span>
+                      <span className="mx-1">·</span>
+                      <span>{product.supplier_name || product.batch_number || 'GENERAL'}</span>
+                    </div>
+
+                    {/* OEM snippet */}
+                    <p
+                      className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate w-full mb-3"
+                      title={product.oem_codes || ''}
+                    >
+                      OEM: {product.oem_codes || '-'}
+                    </p>
+
+                    {/* Footer: Price & Stock & Add */}
+                    <div className="mt-auto pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between w-full gap-2">
+                      <div>
+                        <p className="text-base font-display font-black text-slate-900 dark:text-white tabular-nums group-hover:text-brand transition-colors tracking-tight leading-none">
+                          {formatPrice(product.price)}
+                        </p>
+                        <p className={`text-[10px] font-mono font-bold mt-1 tabular-nums ${
+                          stockStatus === 'sin_stock'
+                            ? 'text-rose-500'
+                            : stockStatus === 'bajo'
+                              ? 'text-amber-600'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                          {stockStatus === 'sin_stock' ? 'Sin Stock (0)' : `Stock: ${product.stock}`}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-colors ${
+                        product.stock <= 0
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                          : 'bg-brand/10 text-brand group-hover:bg-brand group-hover:text-white'
+                      }`}>
+                        <Plus className="w-3 h-3" />
+                        Agregar
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Cart Section */}
-        <div className="w-full lg:w-[450px] tech-card flex flex-col relative overflow-hidden h-auto lg:h-full shrink-0">
+        <div className="w-full lg:w-[440px] tech-card flex flex-col relative overflow-hidden h-auto lg:h-full shrink-0">
           <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-brand text-white rounded-lg flex items-center justify-center shadow-md shadow-brand/20">
@@ -825,10 +688,10 @@ export default function POS() {
               </div>
               <div>
                 <h3 className="font-display font-black text-slate-900 dark:text-white tracking-tight uppercase text-base">
-                  Orden de Corte & Venta
+                  Mostrador de Repuestos
                 </h3>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider tabular-nums">
-                  {cart.length} líneas · {totalCartMeters.toFixed(2)} m · {totalCartArea.toFixed(2)} m²
+                  {cart.length} ítems · {totalCartUnits} unidades
                   {activeQuotationId ? ` · Proforma #${activeQuotationId}` : ''}
                 </p>
               </div>
@@ -865,7 +728,7 @@ export default function POS() {
             {/* Customer Selector + Loyalty Points Info */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                Cliente / Obra Constructora
+                Cliente / Taller / Estancia Agrícola
               </label>
               <div className="relative">
                 <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand w-4 h-4" />
@@ -922,11 +785,11 @@ export default function POS() {
             <div className="space-y-2.5">
               {cart.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                  <Ruler className="w-9 h-9 opacity-25 text-brand" />
+                  <Wrench className="w-9 h-9 opacity-25 text-brand" />
                   <div className="text-center space-y-1 px-4">
-                    <p className="text-[11px] font-black uppercase tracking-widest">Sin Cortes Cargados</p>
+                    <p className="text-[11px] font-black uppercase tracking-widest">Pedido Vacío</p>
                     <p className="text-[10px] font-medium text-slate-400">
-                      Selecciona una calamina de la izquierda para ingresar largo y cantidad de planchas
+                      Haz clic en cualquier repuesto con stock disponible para agregarlo al mostrador
                     </p>
                   </div>
                 </div>
@@ -934,54 +797,64 @@ export default function POS() {
                 cart.map(item => (
                   <div
                     key={item.cartKey}
-                    className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/70 dark:border-slate-800 transition-all hover:border-brand/40"
+                    className="flex items-start justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/70 dark:border-slate-800 transition-all hover:border-brand/40"
                   >
-                    <CalaminaImage product={item.product} aspectClass="w-12 h-12 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-extrabold text-slate-900 dark:text-white tracking-tight truncate leading-tight">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[10px] font-mono font-black text-brand">
+                          {item.product.barcode || `REP-${item.product.id}`}
+                        </span>
+                        <span className="text-[10px] text-slate-400">·</span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase truncate">
+                          {item.product.brand || 'GENERAL'}
+                        </span>
+                      </div>
+                      <p className="text-xs font-extrabold text-slate-900 dark:text-white tracking-tight line-clamp-2 leading-snug">
                         {item.product.name}
                       </p>
-                      <p className="text-[10px] font-mono font-bold text-brand mt-0.5">
-                        {item.measurement_summary || `${item.quantity} m`}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-[10px] font-mono text-slate-400 tabular-nums">
-                          {item.quantity.toFixed(2)} m × {formatPrice(item.product.price)}
+                          {item.quantity} {item.product.unit_type || 'UNIDAD'} × {formatPrice(item.product.price)}
                         </span>
                         <span className="text-xs text-slate-900 dark:text-white font-black tabular-nums">
                           = {formatPrice(item.quantity * item.product.price)}
                         </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => adjustCartItemBySheet(item.cartKey, -1)}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-500 hover:text-brand"
-                          title="Restar 1 plancha / 1 m"
+                          type="button"
+                          onClick={() => updateCartQuantity(item.cartKey, item.quantity - 1)}
+                          className="w-7 h-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-brand"
+                          title="Disminuir"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max={item.product.stock}
+                          value={item.quantity}
+                          onChange={e => updateCartQuantity(item.cartKey, parseInt(e.target.value, 10) || 1)}
+                          className="w-11 h-7 text-center font-mono font-black text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-white tabular-nums"
+                        />
                         <button
-                          onClick={() => adjustCartItemBySheet(item.cartKey, 1)}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-500 hover:text-brand"
-                          title="Sumar 1 plancha / 1 m"
+                          type="button"
+                          onClick={() => updateCartQuantity(item.cartKey, item.quantity + 1)}
+                          className="w-7 h-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-brand"
+                          title="Aumentar"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
                         <button
-                          onClick={() => openMeasurementModal(item.product, item)}
-                          className="p-1 text-slate-400 hover:text-brand"
-                          title="Editar medida"
-                        >
-                          <Ruler className="w-3 h-3" />
-                        </button>
-                        <button
+                          type="button"
                           onClick={() => removeFromCart(item.cartKey)}
-                          className="p-1 text-slate-400 hover:text-rose-500"
+                          className="p-1 text-slate-400 hover:text-rose-500 ml-0.5"
                           title="Quitar"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -995,15 +868,7 @@ export default function POS() {
           <div className="p-5 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 space-y-4">
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Metraje / Superficie Cubierta
-                </span>
-                <span className="font-mono font-bold text-slate-700 dark:text-slate-300 tabular-nums">
-                  {totalCartMeters.toFixed(2)} m · {totalCartArea.toFixed(2)} m²
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subtotal</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subtotal ({totalCartUnits} uds)</span>
                 <span className="font-bold text-slate-700 dark:text-slate-300 tabular-nums">
                   {formatPrice(subtotal)}
                 </span>
@@ -1146,264 +1011,11 @@ export default function POS() {
               className="w-full py-3.5 bg-brand hover:bg-brand/90 text-white rounded-lg font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-brand/20 transition-all border-b-4 border-brand-muted flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShoppingBag className="w-5 h-5" />}
-              {loading ? 'Procesando...' : 'Confirmar Orden y Facturar'}
+              {loading ? 'Procesando...' : 'Confirmar Venta y Facturar'}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Modal 0: Calculadora de Medición y Corte de Calamina */}
-      {measureProduct && (
-        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[105] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]">
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between corrugated-strip">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-brand text-white rounded-lg flex items-center justify-center">
-                  <Ruler className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-display font-extrabold uppercase tracking-tight text-base">
-                    Calculadora de Medición y Corte
-                  </h3>
-                  <p className="text-[10px] text-slate-300 uppercase tracking-widest">
-                    {measureProduct.design_type || measureProduct.category} · {measureProduct.color_name || 'Estándar'} · {measureProduct.thickness || '0.35 mm'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setMeasureProduct(null)}
-                className="p-1.5 hover:bg-white/10 rounded-full text-slate-300 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={confirmMeasurementToCart} className="p-6 overflow-y-auto space-y-5 custom-scrollbar">
-              {/* Product Quick Banner */}
-              <div className="flex items-center gap-4 p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
-                <CalaminaImage product={measureProduct} aspectClass="w-20 h-16 shrink-0" showColorDot />
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-extrabold text-sm text-slate-900 dark:text-white truncate">
-                    {measureProduct.name}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                    Ancho útil: {measureProduct.width_m || 0.85} m · Disponible: {formatMeter(measureProduct.stock)}
-                  </p>
-                  <p className="text-sm font-black text-brand tabular-nums mt-0.5">
-                    {formatPrice(measureProduct.price)} / metro lineal
-                  </p>
-                </div>
-              </div>
-
-              {/* Mode Switcher */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setMeasureMode('sheets')}
-                    className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
-                      measureMode === 'sheets'
-                        ? 'bg-brand text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Por Planchas × Largo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMeasureMode('direct')}
-                    className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
-                      measureMode === 'direct'
-                        ? 'bg-brand text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Metros Lineales Directos
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowAreaHelper(!showAreaHelper)}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand/10 text-brand rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <Calculator className="w-3.5 h-3.5" />
-                  Calcular Techo (m²)
-                </button>
-              </div>
-
-              {/* Optional Roof Coverage Calculator */}
-              {showAreaHelper && (
-                <div className="p-4 bg-amber-50/70 dark:bg-amber-950/20 rounded-xl border border-amber-500/30 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                    Asistente por Dimensiones del Techo
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                        Ancho a cubrir (m)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.5"
-                        value={roofWidth}
-                        onChange={e => setRoofWidth(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-xs text-slate-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                        Largo caída / agua (m)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.5"
-                        value={roofDropLength}
-                        onChange={e => setRoofDropLength(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-xs text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={applyRoofAreaCalculation}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider"
-                  >
-                    Aplicar Planchas Sugeridas (Ancho útil {measureProduct.width_m || 0.85} m)
-                  </button>
-                </div>
-              )}
-
-              {measureMode === 'sheets' ? (
-                <div className="space-y-4">
-                  {/* Standard Length Presets */}
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Largo por Plancha (metros)
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {STANDARD_CUT_LENGTHS.map(len => (
-                        <button
-                          key={len}
-                          type="button"
-                          onClick={() => setSheetLength(len)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all ${
-                            Math.abs(sheetLength - len) < 0.01
-                              ? 'bg-brand text-white border-brand shadow-sm'
-                              : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand/50'
-                          }`}
-                        >
-                          {len.toFixed(1)} m
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                        Largo Exacto (m)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.05"
-                        min="0.5"
-                        required
-                        value={sheetLength}
-                        onChange={e => setSheetLength(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
-                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-black text-lg text-center text-slate-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                        Cantidad de Planchas
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSheetCount(Math.max(1, sheetCount - 1))}
-                          className="w-11 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl font-black text-lg text-slate-700 dark:text-slate-200 hover:bg-slate-200"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={sheetCount}
-                          onChange={e => setSheetCount(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="flex-1 w-full px-3 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-black text-lg text-center text-slate-900 dark:text-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setSheetCount(sheetCount + 1)}
-                          className="w-11 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl font-black text-lg text-slate-700 dark:text-slate-200 hover:bg-slate-200"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                    Metros Lineales Totales a Cortar (m)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="0.25"
-                    required
-                    value={directMeters}
-                    onChange={e => setDirectMeters(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
-                    className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-black text-2xl text-center text-slate-900 dark:text-white"
-                  />
-                </div>
-              )}
-
-              {/* Live Calculation Summary */}
-              <div className="p-4 bg-slate-900 text-white rounded-xl grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="text-[9px] font-black uppercase text-slate-400">Total Metros</p>
-                  <p className="text-lg font-mono font-black tabular-nums">{computedTotalMeters.toFixed(2)} m</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-black uppercase text-slate-400">Área Cubierta</p>
-                  <p className="text-lg font-mono font-black text-sky-400 tabular-nums">
-                    {computedAreaM2.toFixed(2)} m²
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-black uppercase text-slate-400">Importe Corte</p>
-                  <p className="text-lg font-mono font-black text-amber-400 tabular-nums">
-                    {formatPrice(computedTotalMeters * measureProduct.price)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setMeasureProduct(null)}
-                  className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-black uppercase tracking-wider text-xs rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-brand hover:bg-brand/90 text-white font-display font-black uppercase tracking-wider text-xs rounded-xl shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  {editingCartKey ? 'Actualizar Medida' : 'Agregar al Pedido'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal 1: Cash Register (Arqueo y Cierre de Caja) */}
       {showCashModal && (
@@ -1512,7 +1124,7 @@ export default function POS() {
                       />
                       <input
                         type="text"
-                        placeholder="Motivo (ej. Flete, Estibaje, Cambio)"
+                        placeholder="Motivo (ej. Encomienda, Flete, Cambio)"
                         value={cashMoveReason}
                         onChange={e => setCashMoveReason(e.target.value)}
                         className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-900 dark:text-white"
@@ -1613,10 +1225,10 @@ export default function POS() {
                 <FileText className="w-5 h-5 text-brand" />
                 <div>
                   <h3 className="font-display font-black uppercase tracking-wider text-sm">
-                    Cotizaciones y Proformas de Obra
+                    Cotizaciones y Proformas de Repuestos
                   </h3>
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest">
-                    Convierta cualquier proforma por medición en orden de venta
+                    Convierta cualquier proforma pendiente en orden de venta
                   </p>
                 </div>
               </div>
@@ -1655,7 +1267,7 @@ export default function POS() {
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400">
-                        Vence: {q.valid_until} · {q.details?.length || 0} cortes · {q.notes || q.seller_name}
+                        Vence: {q.valid_until} · {q.details?.length || 0} ítems · {q.notes || q.seller_name}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1688,7 +1300,7 @@ export default function POS() {
                 <CheckCircle2 className="w-5 h-5" />
                 <div>
                   <h3 className="font-display font-black uppercase text-sm">
-                    {lastReceipt.type === 'VENTA' ? 'Comprobante de Corte y Venta' : 'Proforma Generada'}
+                    {lastReceipt.type === 'VENTA' ? 'Comprobante de Venta' : 'Proforma Generada'}
                   </h3>
                   <p className="text-[10px] text-emerald-100 font-mono">#{lastReceipt.id.toString().padStart(5, '0')}</p>
                 </div>
@@ -1807,9 +1419,7 @@ export default function POS() {
                     Cargar Imagen QR
                     <input type="file" className="hidden" accept="image/*" onChange={handleQrUpload} />
                   </label>
-                  {isUploadingQr && (
-                    <p className="mt-4 text-[9px] text-brand font-black uppercase tracking-[0.2em]">Guardando...</p>
-                  )}
+                  {isUploadingQr && <p className="text-[9px] text-brand mt-2 uppercase font-bold">Guardando QR...</p>}
                 </div>
               )}
             </div>

@@ -147,7 +147,7 @@ export default function Customers() {
       </div>
 
       {statusMsg && (
-        <div className={`p-4 rounded border-l-4 flex items-center justify-between text-xs font-bold uppercase ${statusMsg.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/30 border-rose-500 text-rose-700 dark:text-rose-300'}`}>
+        <div className={`p-4 rounded border flex items-center justify-between text-xs font-bold uppercase ${statusMsg.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/30 border-rose-500/40 text-rose-700 dark:text-rose-300'}`}>
           <span>{statusMsg.text}</span>
           <button onClick={() => setStatusMsg(null)}><X className="w-4 h-4" /></button>
         </div>
@@ -231,7 +231,7 @@ export default function Customers() {
                   )}
                   {waPhone && (
                     <a
-                      href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${c.name}, le saludamos de AcerTecho Calaminas. Tienes ${c.points || 0} puntos acumulados en tu cuenta.`)}`}
+                      href={`https://wa.me/${waPhone}?text=${encodeURIComponent(`Hola ${c.name}, le saludamos de AgroPartes Tractores S.R.L. Tienes ${c.points || 0} puntos acumulados en tu cuenta.`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all"

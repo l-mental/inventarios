@@ -47,18 +47,18 @@ function SplashScreen() {
           className="text-center"
         >
           <h1 className="text-3xl font-display font-black text-white tracking-tight italic uppercase flex items-center gap-2">
-            AcerTecho <span className="text-orange-400 not-italic font-bold tracking-widest text-xs uppercase">Pro Calaminas</span>
+            AgroPartes <span className="text-orange-400 not-italic font-bold tracking-widest text-xs uppercase">Pro Tractores</span>
           </h1>
           <div className="mt-4 flex items-center justify-center gap-3">
             <Loader2 className="w-4 h-4 text-brand animate-spin" />
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.3em]">Sincronizando Planta</p>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.3em]">Cargando Catálogo OEM</p>
           </div>
         </motion.div>
       </div>
 
       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 text-slate-500">
         <Sparkles className="w-4 h-4 text-brand" />
-        <span className="text-[10px] uppercase font-black tracking-widest">Calaminas &amp; Cubiertas por Medición</span>
+        <span className="text-[10px] uppercase font-black tracking-widest">Repuestos Agrícolas, OEM y Maquinaria</span>
       </div>
     </div>
   );

@@ -3,18 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { DashboardStats, Product } from '../types';
-import { CALAMINA_COLOR_SWATCHES, formatMeter } from '../lib/calaminaCatalog';
-import CalaminaImage from '../components/CalaminaImage';
-import { 
-  TrendingUp, 
-  AlertTriangle, 
+import { TRACTOR_BRANDS, getBrandAccent } from '../data/tractorPartsCatalog';
+import {
+  TrendingUp,
+  AlertTriangle,
   ShoppingBag,
   ArrowUpRight,
   Clock,
   Users,
   BarChart3,
-  Ruler,
-  Layers
+  Wrench,
+  Layers,
+  Cog,
+  ShoppingCart,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -60,7 +61,7 @@ export default function Dashboard() {
       <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
       <h3 className="text-lg font-bold text-red-900">Error al cargar el Dashboard</h3>
       <p className="text-red-600 mt-2">{error}</p>
-      <button 
+      <button
         onClick={() => window.location.reload()}
         className="mt-6 px-6 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all"
       >
@@ -86,40 +87,42 @@ export default function Dashboard() {
     { key: 'year', label: 'Este Año' },
   ] as const;
 
-  const totalMetersStock = products.reduce((sum, p) => sum + Number(p.stock || 0), 0);
+  const totalUnitsStock = products.reduce((sum, p) => sum + Number(p.stock || 0), 0);
 
   const cards = [
     { label: 'Ingresos Totales (Histórico)', value: formatPrice(stats.revenue), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
-    { label: 'Metraje Total en Planta', value: products.length > 0 ? formatMeter(totalMetersStock) : stats.salesCount, icon: Ruler, color: 'text-brand', bg: 'bg-brand/10' },
-    { label: 'Clientes y Constructoras', value: stats.customersCount, icon: Users, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-500/10' },
-    { label: 'Alertas Stock Mínimo', value: stats.lowStock, icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-500/10' },
+    { label: 'Unidades en Almacén', value: products.length > 0 ? totalUnitsStock.toLocaleString() : stats.salesCount, icon: Layers, color: 'text-brand', bg: 'bg-brand/10' },
+    { label: 'Clientes y Talleres', value: stats.customersCount, icon: Users, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-500/10' },
+    { label: 'Repuestos Bajo Mínimo', value: stats.lowStock, icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-500/10' },
   ];
+
+  const brandCardsList = TRACTOR_BRANDS.slice(0, 6);
 
   return (
     <div className="space-y-6 pb-10">
       {/* Welcome Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-brand mb-1">Planta Laminadora &amp; Cubiertas por Medición</p>
-          <h2 className="text-4xl font-display font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Operaciones AcerTecho</h2>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-brand mb-1">Repuestos Agrícolas &amp; OEM para Tractores</p>
+          <h2 className="text-4xl font-display font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Operaciones AgroPartes</h2>
           <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-1">
-            Control de cortes lineales, sucursales y facturación para <span className="text-brand font-bold">{user?.full_name}</span>
+            Control de códigos OEM, stock multi-sucursal y facturación para <span className="text-brand font-bold">{user?.full_name}</span>
           </p>
         </div>
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => navigate('/pos')}
-            className="px-5 py-2.5 bg-brand hover:bg-brand-muted text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md shadow-brand/20 transition-all"
+            className="px-5 py-2.5 bg-brand hover:bg-brand-muted text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md shadow-brand/20 transition-all whitespace-nowrap"
           >
-            <Ruler className="w-4 h-4" />
-            Cotizar / Cortar
+            <ShoppingCart className="w-4 h-4" />
+            Vender / Cotizar
           </button>
           <button
             onClick={() => navigate('/inventory')}
-            className="px-5 py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
+            className="px-5 py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap"
           >
             <Layers className="w-4 h-4" />
-            Traspasar Metros
+            Traspasar Unidades
           </button>
         </div>
       </div>
@@ -147,7 +150,7 @@ export default function Dashboard() {
               <button
                 key={opt.key}
                 onClick={() => setSalesPeriod(opt.key)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
                   salesPeriod === opt.key
                     ? 'bg-brand text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -196,53 +199,51 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Visual Calamina Catalog by Color & Design */}
+      {/* Inventory by Tractor Brand */}
       <div className="tech-card p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
-            <p className="text-[9px] font-black text-brand uppercase tracking-[0.25em]">Muestrario Industrial en Stock</p>
+            <p className="text-[9px] font-black text-brand uppercase tracking-[0.25em]">Stock Distribuido por Maquinaria</p>
             <h3 className="font-display font-black text-lg text-slate-900 dark:text-white uppercase italic tracking-tight">
-              Calaminas por Color y Diseño
+              Inventario por Marca de Tractor
             </h3>
           </div>
           <button
             onClick={() => navigate('/products')}
-            className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline underline-offset-4 flex items-center gap-1"
+            className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline underline-offset-4 flex items-center gap-1 whitespace-nowrap"
           >
-            Administrar Catálogo Completo <ArrowUpRight className="w-3.5 h-3.5" />
+            Administrar Catálogo Completo ({products.length}) <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {CALAMINA_COLOR_SWATCHES.map((swatch) => {
+          {brandCardsList.map((brand) => {
             const matching = products.filter(
-              (p) => (p.color_name || '').toLowerCase() === swatch.name.toLowerCase()
+              (p) => (p.brand || '').toUpperCase() === brand
             );
-            const totalM = matching.reduce((sum, p) => sum + Number(p.stock || 0), 0);
+            const totalUnits = matching.reduce((sum, p) => sum + Number(p.stock || 0), 0);
+            const brandAccent = getBrandAccent(brand);
 
             return (
               <button
-                key={swatch.name}
+                key={brand}
                 onClick={() => navigate('/pos')}
-                className="group text-left bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden hover:border-brand transition-all hover-lift"
+                className="group text-left bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 hover:border-brand transition-all hover-lift flex flex-col justify-between gap-3"
               >
-                <div className="aspect-[4/3] w-full overflow-hidden relative bg-slate-100 dark:bg-slate-800">
-                  <CalaminaImage
-                    src={swatch.image}
-                    alt={swatch.name}
-                    colorHex={swatch.hex}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <div className="p-3 space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10" style={{ backgroundColor: swatch.hex }} />
-                    <p className="text-[11px] font-black text-slate-900 dark:text-white truncate uppercase tracking-tight">
-                      {swatch.name}
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className={`p-2 rounded-lg border ${brandAccent.bg} ${brandAccent.text} ${brandAccent.border}`}>
+                    <Cog className="w-4 h-4" />
                   </div>
-                  <p className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 tabular-nums">
-                    {products.length > 0 ? `${formatMeter(totalM)} disp.` : 'Ver en POS'}
+                  <span className="text-[10px] font-mono font-bold text-slate-400 tabular-nums">
+                    {matching.length} ítems
+                  </span>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-xs font-black text-slate-900 dark:text-white truncate uppercase tracking-tight">
+                    {brand}
+                  </p>
+                  <p className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 tabular-nums">
+                    {totalUnits.toLocaleString()} uds disp.
                   </p>
                 </div>
               </button>
@@ -256,7 +257,7 @@ export default function Dashboard() {
         {cards.map((card, i) => (
           <div key={i} className="tech-grid-item group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
             <div className={`absolute top-0 right-0 w-24 h-24 ${card.bg} rounded-full -mr-12 -mt-12 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
-            
+
             <div className="flex items-center justify-between relative z-10">
               <div className={`${card.bg} p-2.5 rounded transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
                 <card.icon className={`w-5 h-5 ${card.color}`} />
@@ -268,7 +269,7 @@ export default function Dashboard() {
               <p className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{card.label}</p>
               <h3 className="text-3xl font-display font-black text-slate-900 dark:text-white tracking-tighter tabular-nums leading-none">{card.value}</h3>
             </div>
-            
+
             <div className="absolute bottom-0 left-0 h-0.5 bg-brand w-0 group-hover:w-full transition-all duration-700" />
           </div>
         ))}
@@ -283,31 +284,31 @@ export default function Dashboard() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-2xl font-display font-black uppercase italic tracking-tighter leading-none">Equipo &amp; Sucursales</h3>
-                <p className="text-white/80 text-xs font-medium max-w-xs leading-relaxed">Control de vendedores, operadores de corte y permisos por sucursal.</p>
+                <p className="text-white/80 text-xs font-medium max-w-xs leading-relaxed">Control de vendedores de mostrador, encargados de almacén y permisos por sucursal.</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => navigate('/users')}
               className="px-6 py-3 bg-white text-brand font-black text-[10px] uppercase tracking-[0.2em] rounded border-b-4 border-slate-200 hover:border-white hover:translate-y-px transition-all w-fit shadow-xl"
             >
               Gestionar Acceso
             </button>
           </div>
-          
+
           <div className="bg-white dark:bg-slate-900 p-8 flex flex-col justify-between gap-10">
             <div className="space-y-4">
               <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-rose-500" />
+                <Wrench className="w-6 h-6 text-rose-500" />
               </div>
               <div className="space-y-2">
                 <p className="text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none">Control de Stock Mínimo</p>
-                <h3 className="text-2xl font-display font-black uppercase italic tracking-tighter leading-none text-slate-900 dark:text-white">Reposición de Bobinas</h3>
+                <h3 className="text-2xl font-display font-black uppercase italic tracking-tighter leading-none text-slate-900 dark:text-white">Reposición de Repuestos</h3>
                 <p className="text-slate-500 dark:text-slate-400 text-xs font-medium max-w-xs leading-relaxed">
-                  Se han detectado <span className="text-rose-500 font-bold">{stats.lowStock} materiales</span> bajo el umbral mínimo configurado en planta.
+                  Se han detectado <span className="text-rose-500 font-bold">{stats.lowStock} repuestos</span> bajo el umbral mínimo configurado en almacén.
                 </p>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => navigate('/products')}
               className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-[10px] uppercase tracking-[0.2em] rounded border-b-4 border-slate-700 dark:border-slate-200 hover:translate-y-px transition-all w-fit"
             >
@@ -327,7 +328,6 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-brand rounded-full"></div>
                 <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas Confirmadas</span>
               </div>
             </div>
@@ -336,23 +336,23 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={100}>
               <BarChart data={stats.salesByDay}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1e293b' : '#f1f5f9'} />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="date"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: theme === 'dark' ? '#64748b' : '#94a3b8', fontSize: 10, fontWeight: 700 }}
                   dy={10}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: theme === 'dark' ? '#64748b' : '#94a3b8', fontSize: 10, fontWeight: 700 }}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: theme === 'dark' ? '#0f172a' : '#f8fafc' }}
-                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: '1px solid ' + (theme === 'dark' ? '#1e293b' : '#e2e8f0'), 
+                  contentStyle={{
+                    borderRadius: '8px',
+                    border: '1px solid ' + (theme === 'dark' ? '#1e293b' : '#e2e8f0'),
                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                     backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
                     color: theme === 'dark' ? '#f8fafc' : '#0f172a',
@@ -381,13 +381,13 @@ export default function Dashboard() {
               <div key={i} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between group">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase group-hover:border-brand transition-colors">
-                    {sale.seller.split(' ').map(n=>n[0]).join('')}
+                    {sale.seller.split(' ').map(n => n[0]).join('')}
                   </div>
                   <div>
                     <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{sale.seller}</p>
                     <div className="flex items-center gap-2">
-                       <Clock className="w-3 h-3 text-slate-400" />
-                       <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
                         {new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -398,7 +398,7 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800">
-            <button 
+            <button
               onClick={() => navigate('/sales')}
               className="w-full py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.25em] hover:text-brand hover:border-brand transition-all rounded shadow-sm"
             >

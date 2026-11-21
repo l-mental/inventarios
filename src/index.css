@@ -8,7 +8,7 @@
   --font-display: "Bricolage Grotesque", "Plus Jakarta Sans", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Architectural Steel & Terracotta Roofing Palette */
+  /* Heavy Agricultural Machinery & Tractor Spare Parts Palette */
   --color-brand: #c2410c;
   --color-brand-muted: #9a3412;
   --color-steel: #1e293b;
@@ -57,24 +57,24 @@
     @apply bg-white dark:bg-[#111827] p-5;
   }
 
-  /* Corrugated steel architectural motif */
+  /* Industrial machinery workshop background motif */
   .corrugated-strip {
     background-image: repeating-linear-gradient(
-      90deg,
-      rgba(15, 23, 42, 0.04) 0px,
-      rgba(15, 23, 42, 0.04) 6px,
-      transparent 6px,
-      transparent 14px
+      135deg,
+      rgba(15, 23, 42, 0.03) 0px,
+      rgba(15, 23, 42, 0.03) 8px,
+      transparent 8px,
+      transparent 16px
     );
   }
 
   .dark .corrugated-strip {
     background-image: repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.04) 0px,
-      rgba(255, 255, 255, 0.04) 6px,
-      transparent 6px,
-      transparent 14px
+      135deg,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 8px,
+      transparent 8px,
+      transparent 16px
     );
   }
 
@@ -83,11 +83,11 @@
     background-image: repeating-linear-gradient(
       90deg,
       #c2410c 0px,
-      #c2410c 12px,
-      #ea580c 12px,
-      #ea580c 16px,
-      #9a3412 16px,
-      #9a3412 24px
+      #c2410c 14px,
+      #f59e0b 14px,
+      #f59e0b 20px,
+      #1e293b 20px,
+      #1e293b 28px
     );
   }
 

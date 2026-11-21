@@ -41,11 +41,11 @@ interface SettingsContextType {
 }
 
 const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
-  company_name: 'AcerTecho Calaminas S.R.L.',
+  company_name: 'AgroPartes Tractores S.R.L.',
   company_nit: '1028495021',
   currency: 'Bs',
   phone: '77889900',
-  address: 'Parque Industrial Norte Mz. 4, Planta de Laminado y Corte',
+  address: 'Av. Agrícola Km 4, Zona Talleres Maquinaria Pesada',
   tax_percentage: '13',
 };
 

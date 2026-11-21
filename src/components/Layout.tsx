@@ -42,22 +42,22 @@ export default function Layout() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Tablero Principal', icon: LayoutDashboard, roles: ['Admin', 'Vendedor'] },
-    { id: 'pos', label: 'Cotizar / POS Medición', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
-    { id: 'purchases', label: 'Compras Bobinas', icon: Truck, roles: ['Admin', 'Vendedor'] },
+    { id: 'pos', label: 'Cotizar / POS Mostrador', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
+    { id: 'purchases', label: 'Compras Proveedores', icon: Truck, roles: ['Admin', 'Vendedor'] },
     { 
       id: 'inventario-group', 
-      label: 'Planta y Stock', 
+      label: 'Almacén y Stock', 
       icon: Database, 
       roles: ['Admin', 'Vendedor'],
       isGroup: true,
       subItems: [
-        { id: 'products', label: 'Catálogo Calaminas', icon: Package },
-        { id: 'inventory', label: 'Metraje y Traspasos', icon: History },
+        { id: 'products', label: 'Catálogo Repuestos', icon: Package },
+        { id: 'inventory', label: 'Kardex y Traspasos', icon: History },
       ]
     },
     { id: 'sales', label: 'Historial Ventas', icon: ShoppingBag, roles: ['Admin', 'Vendedor'] },
     { id: 'finance', label: 'Finanzas y Reportes', icon: TrendingUp, roles: ['Admin', 'Vendedor'] },
-    { id: 'customers', label: 'Base Clientes', icon: UsersIcon, roles: ['Admin', 'Vendedor'] },
+    { id: 'customers', label: 'Clientes y Talleres', icon: UsersIcon, roles: ['Admin', 'Vendedor'] },
     { id: 'users', label: 'Equipo / Staff', icon: Shield, roles: ['Admin'] },
     { id: 'audit', label: 'Seguridad / Aud.', icon: Activity, roles: ['Admin'] },
     { id: 'settings', label: 'Panel Control', icon: Settings, roles: ['Admin'] },
@@ -98,8 +98,8 @@ export default function Layout() {
             <Package className="text-white w-5 h-5" />
           </div>
           <div className="cursor-pointer" onClick={() => handleNavigate('dashboard')}>
-            <h1 className="font-display font-black text-slate-900 dark:text-white tracking-tight text-lg uppercase italic">AcerTecho</h1>
-            <p className="text-[9px] text-brand font-black uppercase tracking-[0.2em] -mt-1 leading-none">Pro Calaminas</p>
+            <h1 className="font-display font-black text-slate-900 dark:text-white tracking-tight text-lg uppercase italic">AgroPartes</h1>
+            <p className="text-[9px] text-brand font-black uppercase tracking-[0.2em] -mt-1 leading-none">Pro Repuestos</p>
           </div>
         </div>
 
@@ -211,10 +211,10 @@ export default function Layout() {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              <span className="text-brand">AcerTecho S.R.L.</span>
+            <div className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 whitespace-nowrap">
+              <span className="text-brand">AgroPartes Tractores S.R.L.</span>
               <span>·</span>
-              <span>Venta &amp; Corte por Medición</span>
+              <span>Repuestos Agrícolas &amp; OEM</span>
             </div>
           </div>
 

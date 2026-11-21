@@ -117,11 +117,11 @@ export default function SalesHistory() {
   const getWhatsAppReceiptLink = (sale: Sale) => {
     const cleanPhone = whatsappPhone.replace(/\D/g, '');
     const finalPhone = cleanPhone.length === 8 ? `591${cleanPhone}` : cleanPhone;
-    const company = settings.company_name || 'AcerTecho Calaminas S.R.L.';
+    const company = settings.company_name || 'AgroPartes Tractores S.R.L.';
     const isCancelled = sale.status === 'CANCELLED';
 
     const itemsText = (sale.details || [])
-      .map(d => `• ${d.product_name}\n  ${d.measurement_summary ? d.measurement_summary : `${d.quantity} m`} — ${formatPrice(d.subtotal)}`)
+      .map(d => `• ${d.product_name}\n  ${d.measurement_summary ? d.measurement_summary : `${d.quantity} uds`} — ${formatPrice(d.subtotal)}`)
       .join('\n');
     const message = [
       `*${company.toUpperCase()} - COMPROBANTE DE VENTA ${isCancelled ? '(ANULADA)' : ''}*`,
@@ -533,9 +533,9 @@ export default function SalesHistory() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/50">
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase">Material / Medición</th>
-                      <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Metraje</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase">Precio / m</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase">Repuesto / Código</th>
+                      <th className="px-4 py-3 text-center text-xs font-bold text-slate-400 uppercase">Cant.</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase">Precio Unit.</th>
                       <th className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase">Subtotal</th>
                     </tr>
                   </thead>
@@ -548,7 +548,7 @@ export default function SalesHistory() {
                             <p className="text-[11px] font-mono text-brand mt-0.5">{detail.measurement_summary}</p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-center font-mono text-slate-600 dark:text-slate-300 tabular-nums">{detail.quantity} m</td>
+                        <td className="px-4 py-3 text-sm text-center font-mono text-slate-600 dark:text-slate-300 tabular-nums">{detail.quantity} uds</td>
                         <td className="px-4 py-3 text-sm text-right text-slate-500 tabular-nums">{formatPrice(detail.unit_price)}</td>
                         <td className="px-4 py-3 text-sm text-right font-bold text-slate-900 dark:text-white tabular-nums">{formatPrice(detail.subtotal)}</td>
                       </tr>

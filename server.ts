@@ -7,6 +7,7 @@ import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
+import { TRACTOR_PARTS_PRODUCTS, DEFAULT_TRACTOR_SUPPLIERS } from './src/data/tractorPartsCatalog.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,7 +181,10 @@ try { db.exec("ALTER TABLE products ADD COLUMN color_hex TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE products ADD COLUMN thickness TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE products ADD COLUMN width_m REAL DEFAULT 0.85"); } catch (e) {}
 try { db.exec("ALTER TABLE products ADD COLUMN standard_length_m REAL DEFAULT 3.0"); } catch (e) {}
-try { db.exec("ALTER TABLE products ADD COLUMN unit_type TEXT DEFAULT 'm'"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN unit_type TEXT DEFAULT 'UNIDAD'"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN brand TEXT DEFAULT 'GENERAL'"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN oem_codes TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE products ADD COLUMN supplier_name TEXT"); } catch (e) {}
 
 try { db.exec("ALTER TABLE sale_details ADD COLUMN sheet_length_m REAL"); } catch (e) {}
 try { db.exec("ALTER TABLE sale_details ADD COLUMN sheet_count REAL"); } catch (e) {}
@@ -321,288 +325,93 @@ const seed = () => {
       .run('vendedor', hashedPassword, 'Carlos Vendedor', vendedorRole.id);
   }
 
+  // Check if database still holds legacy Calamina demo data without tractor parts
+  const legacyCalaminaExists = db.prepare("SELECT count(*) as count FROM products WHERE barcode = 'CAL-ZNC-035'").get() as { count: number };
+  const hasTractorPart = db.prepare("SELECT count(*) as count FROM products WHERE barcode = 'EM9532'").get() as { count: number };
+
+  if (legacyCalaminaExists.count > 0 && hasTractorPart.count === 0) {
+    console.log('Migrating legacy Calamina demo DB to Tractor Spare Parts catalog (91 items)...');
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      DELETE FROM sale_details;
+      DELETE FROM sales;
+      DELETE FROM quotation_details;
+      DELETE FROM quotations;
+      DELETE FROM credit_payments;
+      DELETE FROM purchase_details;
+      DELETE FROM purchases;
+      DELETE FROM branch_transfers;
+      DELETE FROM inventory_movements;
+      DELETE FROM products;
+      DELETE FROM suppliers;
+      DELETE FROM customers;
+      DELETE FROM expenses;
+      DELETE FROM cash_movements;
+      DELETE FROM cash_sessions;
+      DELETE FROM sqlite_sequence WHERE name IN ('products','suppliers','customers','sales','sale_details','quotations','quotation_details','purchases','purchase_details','inventory_movements','branch_transfers','expenses','cash_sessions','cash_movements');
+    `);
+    db.pragma('foreign_keys = ON');
+    db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run('company_name', 'AgroPartes Tractores S.R.L.');
+    db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run('address', 'Av. Agrícola Km 4, Zona Talleres Maquinaria Pesada');
+  }
+
   // Seed Suppliers
   const suppliersCount = db.prepare('SELECT count(*) as count FROM suppliers').get() as { count: number };
   if (suppliersCount.count === 0) {
-    console.log('Seeding suppliers');
-    const sellers = [
-      ['Aceros & Bobinas del Sur S.A.', '77771234', 'ventas@acerossur.bo', 'Parque Industrial PI-14'],
-      ['Metalúrgica Altiplano', '76543210', 'bobinas@metalaltiplano.com', 'Carretera al Norte Km 12'],
-      ['Policarbonatos & Techos Latam', '74504589', 'importaciones@politech.com', 'Zona Franca Industrial']
-    ];
-    sellers.forEach(([name, phone, email, address]) => {
-      db.prepare('INSERT INTO suppliers (name, phone, email, address) VALUES (?, ?, ?, ?)').run(name, phone, email, address);
+    console.log('Seeding tractor parts suppliers');
+    const insertSup = db.prepare('INSERT INTO suppliers (name, phone, email, address) VALUES (?, ?, ?, ?)');
+    DEFAULT_TRACTOR_SUPPLIERS.forEach((s) => {
+      insertSup.run(s.name, s.phone, s.email, s.address);
     });
   }
 
-  // Seed Calamina Products
+  // Seed Tractor Spare Parts (91 items)
   const productsCount = db.prepare('SELECT count(*) as count FROM products WHERE active = 1').get() as { count: number };
   if (productsCount.count === 0) {
-    console.log('Seeding calamina products');
-    const defaultProducts = [
-      {
-        name: 'Calamina Ondulada Zinc Galvanizada 0.35mm',
-        description: 'Lámina de acero galvanizado por inmersión en caliente, perfil ondulado tradicional resistente a granizo y corrosión.',
-        price: 28.50,
-        cost_price: 19.20,
-        stock: 600,
-        min_stock: 0,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 500, 'Sucursal Norte': 100 }),
-        category: 'Calamina Ondulada',
-        barcode: 'CAL-ZNC-035',
-        batch_number: 'BOB-26Z01',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
-        design_type: 'Ondulada Sinusoidal',
-        color_name: 'Zinc Galvanizado',
-        color_hex: '#94a3b8',
-        thickness: '0.35 mm',
-        width_m: 0.80,
-        standard_length_m: 3.00,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Tipo Teja Colonial Rojo Teja 0.40mm',
-        description: 'Acero prepintado estampado tipo teja española clásica con recubrimiento UV de alta durabilidad térmica.',
-        price: 48.00,
-        cost_price: 31.50,
-        stock: 420,
-        min_stock: 40,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 300, 'Sucursal Norte': 120 }),
-        category: 'Calamina Teja Colonial',
-        barcode: 'CAL-TEJ-040',
-        batch_number: 'BOB-26R02',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
-        design_type: 'Teja Colonial Española',
-        color_name: 'Rojo Teja',
-        color_hex: '#b91c1c',
-        thickness: '0.40 mm',
-        width_m: 1.00,
-        standard_length_m: 3.60,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Trapezoidal TR4 Azul Rey 0.40mm',
-        description: 'Perfil trapezoidal estructural de 4 crestas para naves industriales, tinglados y cubiertas de gran luz.',
-        price: 42.00,
-        cost_price: 27.80,
-        stock: 380,
-        min_stock: 30,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 260, 'Sucursal Norte': 120 }),
-        category: 'Calamina Trapezoidal',
-        barcode: 'CAL-TR4-AZ40',
-        batch_number: 'BOB-26A03',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_azul_trapezoidal_1795139680949.jpg',
-        design_type: 'Trapezoidal TR4',
-        color_name: 'Azul Rey',
-        color_hex: '#1d4ed8',
-        thickness: '0.40 mm',
-        width_m: 1.05,
-        standard_length_m: 6.00,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Trapezoidal TR4 Verde Bosque 0.40mm',
-        description: 'Chapa trapezoidal prepintada con esmalte poliéster horneado color verde bosque para viviendas y cabañas.',
-        price: 42.00,
-        cost_price: 27.80,
-        stock: 290,
-        min_stock: 25,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 200, 'Sucursal Norte': 90 }),
-        category: 'Calamina Trapezoidal',
-        barcode: 'CAL-TR4-VR40',
-        batch_number: 'BOB-26V04',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_verde_trapezoidal_1795139681356.jpg',
-        design_type: 'Trapezoidal TR4',
-        color_name: 'Verde Bosque',
-        color_hex: '#15803d',
-        thickness: '0.40 mm',
-        width_m: 1.05,
-        standard_length_m: 4.00,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Ondulada Gris Antracita Mate 0.45mm',
-        description: 'Acabado arquitectónico mate oscuro de alta resistencia estructural, ideal para techos modernos y fachadas.',
-        price: 45.50,
-        cost_price: 30.20,
-        stock: 310,
-        min_stock: 20,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 220, 'Sucursal Norte': 90 }),
-        category: 'Calamina Ondulada',
-        barcode: 'CAL-OND-ANT45',
-        batch_number: 'BOB-26G05',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_antracita_ondulada_1795139681264.jpg',
-        design_type: 'Ondulada Sinusoidal',
-        color_name: 'Gris Antracita',
-        color_hex: '#334155',
-        thickness: '0.45 mm',
-        width_m: 0.85,
-        standard_length_m: 3.60,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Translúcida Policarbonato Cristal 0.80mm',
-        description: 'Lámina ondulada translúcida con filtro UV para iluminación natural de galpones, patios y lavanderías.',
-        price: 52.00,
-        cost_price: 33.40,
-        stock: 180,
-        min_stock: 15,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 120, 'Sucursal Norte': 60 }),
-        category: 'Calamina Translúcida',
-        barcode: 'CAL-POL-080',
-        batch_number: 'BOB-26P06',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_translucida_policarbonato_1795139681734.jpg',
-        design_type: 'Translúcida Policarbonato',
-        color_name: 'Cristal Translúcido',
-        color_hex: '#cbd5e1',
-        thickness: '0.80 mm (PC)',
-        width_m: 0.80,
-        standard_length_m: 3.00,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Ondulada Zinc Pesada 0.50mm',
-        description: 'Calamina galvanizada de calibre grueso reforzado para zonas de vientos fuertes y cubiertas comerciales.',
-        price: 39.00,
-        cost_price: 26.50,
-        stock: 250,
-        min_stock: 20,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 180, 'Sucursal Norte': 70 }),
-        category: 'Calamina Ondulada',
-        barcode: 'CAL-ZNC-050',
-        batch_number: 'BOB-26Z07',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
-        design_type: 'Ondulada Sinusoidal',
-        color_name: 'Zinc Galvanizado',
-        color_hex: '#94a3b8',
-        thickness: '0.50 mm',
-        width_m: 0.85,
-        standard_length_m: 3.60,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Teja Colonial Rojo Terracota 0.45mm',
-        description: 'Perfil tipo teja de calibre 0.45 mm de alto espesor, terminación satinada antidecoloración.',
-        price: 54.00,
-        cost_price: 36.00,
-        stock: 210,
-        min_stock: 15,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 150, 'Sucursal Norte': 60 }),
-        category: 'Calamina Teja Colonial',
-        barcode: 'CAL-TEJ-045',
-        batch_number: 'BOB-26R08',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
-        design_type: 'Teja Colonial Española',
-        color_name: 'Rojo Teja',
-        color_hex: '#b91c1c',
-        thickness: '0.45 mm',
-        width_m: 1.00,
-        standard_length_m: 3.60,
-        unit_type: 'm'
-      },
-      {
-        name: 'Calamina Trapezoidal TR4 Azul Industrial 0.50mm',
-        description: 'Plancha trapezoidal pesada calibre 0.50 mm prepintada azul rey para tinglados de gran envergadura.',
-        price: 49.50,
-        cost_price: 33.20,
-        stock: 240,
-        min_stock: 0,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 160, 'Sucursal Norte': 80 }),
-        category: 'Calamina Trapezoidal',
-        barcode: 'CAL-TR4-AZ50',
-        batch_number: 'BOB-26A09',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_azul_trapezoidal_1795139680949.jpg',
-        design_type: 'Trapezoidal TR4',
-        color_name: 'Azul Rey',
-        color_hex: '#1d4ed8',
-        thickness: '0.50 mm',
-        width_m: 1.05,
-        standard_length_m: 6.00,
-        unit_type: 'm'
-      },
-      {
-        name: 'Cumbrera Metálica Rojo Teja (Desarrollo 40cm)',
-        description: 'Caballete de remate superior plegado en acero prepintado Rojo Teja, se vende por metro lineal.',
-        price: 24.00,
-        cost_price: 15.00,
-        stock: 120,
-        min_stock: 10,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 85, 'Sucursal Norte': 35 }),
-        category: 'Cumbreras y Canaletas',
-        barcode: 'ACC-CUM-ROJ',
-        batch_number: 'PLE-26C10',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_roja_teja_1795139681028.jpg',
-        design_type: 'Cumbrera / Remate',
-        color_name: 'Rojo Teja',
-        color_hex: '#b91c1c',
-        thickness: '0.40 mm',
-        width_m: 0.40,
-        standard_length_m: 2.00,
-        unit_type: 'm'
-      },
-      {
-        name: 'Cumbrera Galvanizada Estándar (Desarrollo 40cm)',
-        description: 'Caballete galvanizado plegado para unión de dos aguas en cubiertas metálicas.',
-        price: 18.50,
-        cost_price: 11.40,
-        stock: 160,
-        min_stock: 0,
-        branch_stocks: JSON.stringify({ 'Sucursal Central': 110, 'Sucursal Norte': 50 }),
-        category: 'Cumbreras y Canaletas',
-        barcode: 'ACC-CUM-ZNC',
-        batch_number: 'PLE-26C11',
-        expiry_date: '2030-12-31',
-        image_url: '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
-        design_type: 'Cumbrera / Remate',
-        color_name: 'Zinc Galvanizado',
-        color_hex: '#94a3b8',
-        thickness: '0.35 mm',
-        width_m: 0.40,
-        standard_length_m: 2.00,
-        unit_type: 'm'
-      }
-    ];
-
+    console.log('Seeding 91 tractor spare parts products');
     const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
     const insertProduct = db.prepare(`
       INSERT INTO products (
         name, description, price, cost_price, stock, min_stock, branch_stocks,
-        category, barcode, batch_number, expiry_date, image_url, design_type,
-        color_name, color_hex, thickness, width_m, standard_length_m, unit_type, active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        category, brand, oem_codes, supplier_name, barcode, batch_number, expiry_date, unit_type, active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
     const insertMovement = db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)');
 
-    defaultProducts.forEach((p) => {
+    TRACTOR_PARTS_PRODUCTS.forEach((p) => {
       const res = insertProduct.run(
-        p.name, p.description, p.price, p.cost_price, p.stock, p.min_stock, p.branch_stocks,
-        p.category, p.barcode, p.batch_number, p.expiry_date, p.image_url, p.design_type,
-        p.color_name, p.color_hex, p.thickness, p.width_m, p.standard_length_m, p.unit_type
+        p.name,
+        p.description || null,
+        p.price,
+        p.cost_price ?? 0,
+        p.stock,
+        p.min_stock ?? 0,
+        JSON.stringify(p.branch_stocks || { 'Sucursal Central': p.stock, 'Sucursal Norte': 0, 'Sucursal Sur': 0 }),
+        p.category,
+        p.brand || 'GENERAL',
+        p.oem_codes || '',
+        p.supplier_name || 'GENERAL',
+        p.barcode || '',
+        p.supplier_name || p.batch_number || 'GENERAL',
+        p.expiry_date || '2030-12-31',
+        p.unit_type || 'UNIDAD'
       );
-      insertMovement.run(res.lastInsertRowid, adminUser.id, 'IN', p.stock, 'Carga inicial de bobinas (metros lineales)');
+      if (p.stock > 0) {
+        insertMovement.run(res.lastInsertRowid, adminUser.id, 'IN', p.stock, `Carga inicial (${p.supplier_name || p.brand || 'Almacén'})`);
+      }
     });
   }
 
   // Seed Customers
   const customersCount = db.prepare('SELECT count(*) as count FROM customers').get() as { count: number };
   if (customersCount.count === 0) {
-    console.log('Seeding customers');
+    console.log('Seeding tractor parts customers');
     const defaultCustomers = [
-      ['Constructora Horizonte S.R.L.', 'compras@horizonte.bo', '78945612', 'Av. Cristo Redentor Km 5'],
-      ['Ferretería El Constructor', 'pedidos@elconstructor.bo', '71239845', 'Av. Mutualista #420'],
-      ['Arq. Roberto Mamani', 'rmamani@arqestudio.com', '68521479', 'Zona Equipetrol Calle 8'],
-      ['Inmobiliaria Cordillera', 'obras@cordillera.bo', '74125896', 'Av. Banzer #1200'],
-      ['Juan Carlos Condori', 'jc.condori@gmail.com', '77445566', 'Plan 3000 Av. Paurito']
+      ['Estancia Agrícola El Porvenir', 'compras@elporvenir.bo', '78945612', 'Carretera al Norte Km 32'],
+      ['Taller Mecánico Diesel & Agro', 'taller.dieselagro@gmail.com', '71239845', 'Av. Cristo Redentor Km 8'],
+      ['Cooperativa Cañeros Unidos', 'logistica@canerosunidos.org', '68521479', 'Zona Montero Parque Industrial'],
+      ['Ing. Roberto Chávez Mendoza', 'rchavez@agroservicios.bo', '74125896', 'Av. Banzer 4to Anillo #402'],
+      ['Hacienda San Ignacio S.R.L.', 'repuestos@sanignacio.com', '77445566', 'Ruta San Ignacio Km 14']
     ];
     const insertCustomer = db.prepare('INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)');
     defaultCustomers.forEach(([name, email, phone, address]) => {
@@ -615,11 +424,11 @@ const seed = () => {
   if (settingsCount.count <= 1) {
     console.log('Seeding system settings');
     const defaultSettings = [
-      ['company_name', 'AcerTecho Calaminas S.R.L.'],
-      ['company_nit', '1023456789'],
+      ['company_name', 'AgroPartes Tractores S.R.L.'],
+      ['company_nit', '1028495021'],
       ['currency', 'Bs'],
       ['phone', '77889900'],
-      ['address', 'Parque Industrial Norte Mza. 14, Santa Cruz'],
+      ['address', 'Av. Agrícola Km 4, Zona Talleres Maquinaria Pesada'],
       ['tax_percentage', '13']
     ];
     const insertSetting = db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)');
@@ -631,68 +440,32 @@ const seed = () => {
   // Seed Initial Sales if empty
   const salesCount = db.prepare('SELECT count(*) as count FROM sales').get() as { count: number };
   if (salesCount.count === 0) {
-    console.log('Seeding demo sales');
+    console.log('Seeding demo tractor parts sales');
     const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-    const firstCustomer = db.prepare('SELECT id FROM customers LIMIT 1').get() as { id: number } | undefined;
-    const sampleProducts = db.prepare('SELECT id, price, width_m FROM products LIMIT 3').all() as { id: number; price: number; width_m?: number }[];
+    const workshopCust = db.prepare('SELECT id FROM customers LIMIT 1 OFFSET 1').get() as { id: number } | undefined;
+    const pistonProd = db.prepare("SELECT id, price FROM products WHERE barcode = 'EM9532'").get() as { id: number; price: number } | undefined;
+    const cojineteProd = db.prepare("SELECT id, price FROM products WHERE barcode = '4949'").get() as { id: number; price: number } | undefined;
 
-    if (sampleProducts.length > 0) {
-      const targetProd = sampleProducts[1] || sampleProducts[0];
-      const qtyMeters = 36;
-      const totalAmt = Number((targetProd.price * qtyMeters).toFixed(2));
+    if (pistonProd && cojineteProd) {
+      const totalAmt = Number((pistonProd.price * 2 + cojineteProd.price).toFixed(2));
       const saleResult = db.prepare('INSERT INTO sales (user_id, customer_id, total, payment_method, cash_amount, paid_amount, with_invoice, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(adminUser.id, firstCustomer ? firstCustomer.id : null, totalAmt, 'CASH', totalAmt, totalAmt, 1, 'COMPLETED');
+        .run(adminUser.id, workshopCust ? workshopCust.id : null, totalAmt, 'CASH', totalAmt, totalAmt, 1, 'COMPLETED');
       const saleId = saleResult.lastInsertRowid;
 
-      db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(saleId, targetProd.id, qtyMeters, targetProd.price, totalAmt, 3.60, 10, '10 planchas × 3.60 m = 36.00 m (36.00 m²)');
+      db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
+        .run(saleId, pistonProd.id, 2, pistonProd.price, Number((pistonProd.price * 2).toFixed(2)));
+      db.prepare('INSERT INTO sale_details (sale_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
+        .run(saleId, cojineteProd.id, 1, cojineteProd.price, cojineteProd.price);
     }
   }
 
   const allProds = db.prepare('SELECT id, price, cost_price, barcode, batch_number, expiry_date FROM products').all() as any[];
 
-  // Seed a Combo/Pack product if none exists
-  const comboExists = db.prepare('SELECT count(*) as count FROM products WHERE is_combo = 1 AND active = 1').get() as { count: number };
-  if (comboExists.count === 0 && allProds.length >= 6) {
-    const comboItems = JSON.stringify([
-      { product_id: allProds[3].id, quantity: 1 },
-      { product_id: allProds[5].id, quantity: 1 }
-    ]);
-    db.prepare(`
-      INSERT INTO products (
-        name, description, price, cost_price, stock, min_stock, branch_stocks,
-        category, barcode, batch_number, expiry_date, is_combo, combo_items,
-        image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type, active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    `).run(
-      'Pack Cubierta Mixta (Trapezoidal Verde + Luz Natural)',
-      'Combo de techo por medición: combina plancha Trapezoidal Verde Bosque con tragaluz Policarbonato.',
-      78.00,
-      51.00,
-      45,
-      0,
-      JSON.stringify({ 'Sucursal Central': 30, 'Sucursal Norte': 15 }),
-      'Packs de Techo',
-      'PCK-TEC-VER',
-      'PCK-26-01',
-      '2030-12-31',
-      comboItems,
-      '/src/assets/images/calamina_verde_trapezoidal_1795139681356.jpg',
-      'Pack Completo',
-      'Verde Bosque',
-      '#15803d',
-      '0.40 mm',
-      1.05,
-      3.00,
-      'm'
-    );
-  }
-
   // Backfill customer loyalty points if all 0
   const customersWithPoints = db.prepare('SELECT count(*) as count FROM customers WHERE points > 0').get() as { count: number };
   if (customersWithPoints.count === 0) {
     const custs = db.prepare('SELECT id FROM customers').all() as { id: number }[];
-    const samplePoints = [180, 120, 65, 240, 45];
+    const samplePoints = [240, 165, 320, 90, 410];
     custs.forEach((c, idx) => {
       db.prepare('UPDATE customers SET points = ? WHERE id = ?').run(samplePoints[idx % samplePoints.length], c.id);
     });
@@ -704,9 +477,9 @@ const seed = () => {
     const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
     const today = new Date().toISOString().split('T')[0];
     const defaultExpenses = [
-      ['Alquiler', 'Alquiler galpón de corte y almacenamiento Norte', 3200.00, today, 'QR'],
-      ['Servicios Básicos', 'Energía trifásica para perfiladora y cizalla', 680.00, today, 'CASH'],
-      ['Logística y Transporte', 'Flete camión grúa entrega de calaminas en obra', 350.00, today, 'CASH']
+      ['Alquiler', 'Alquiler tienda y almacén central de repuestos agrícolas', 2400.00, today, 'QR'],
+      ['Servicios Básicos', 'Energía eléctrica e internet tienda principal', 380.00, today, 'CASH'],
+      ['Logística y Transporte', 'Despacho y flete importación QTP / GB Ricambi', 420.00, today, 'QR']
     ];
     const insertExpense = db.prepare('INSERT INTO expenses (user_id, category, description, amount, expense_date, payment_method) VALUES (?, ?, ?, ?, ?, ?)');
     defaultExpenses.forEach(([cat, desc, amount, date, method]) => {
@@ -719,22 +492,27 @@ const seed = () => {
   if (cashSessionCount.count === 0) {
     const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
     const sessionRes = db.prepare('INSERT INTO cash_sessions (user_id, opening_amount, extra_income, extra_expense, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(adminUser.id, 500.00, 100.00, 0.00, 'Apertura de turno Planta Central', 'OPEN');
+      .run(adminUser.id, 500.00, 150.00, 0.00, 'Apertura de turno Sucursal Central', 'OPEN');
     db.prepare('INSERT INTO cash_movements (session_id, user_id, type, amount, reason) VALUES (?, ?, ?, ?, ?)')
-      .run(sessionRes.lastInsertRowid, adminUser.id, 'INCOME', 100.00, 'Fondo sencillo para corte y despacho');
+      .run(sessionRes.lastInsertRowid, adminUser.id, 'INCOME', 150.00, 'Fondo sencillo para caja mostrador');
   }
 
   // Seed a Demo Quotation if none exists
   const quotationCount = db.prepare('SELECT count(*) as count FROM quotations').get() as { count: number };
   if (quotationCount.count === 0 && allProds.length >= 3) {
     const adminUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as { id: number };
-    const secondCustomer = db.prepare('SELECT id FROM customers LIMIT 1 OFFSET 1').get() as { id: number } | undefined;
-    const tr4Prod = allProds[2];
-    const totalQ = Number((tr4Prod.price * 60).toFixed(2));
-    const qRes = db.prepare('INSERT INTO quotations (user_id, customer_id, total, valid_until, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(adminUser.id, secondCustomer ? secondCustomer.id : null, totalQ, new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], 'Proforma corte a medida TR4 Azul Rey para tinglado 12x8m', 'PENDING');
-    db.prepare('INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(qRes.lastInsertRowid, tr4Prod.id, 60, tr4Prod.price, totalQ, 6.00, 10, '10 planchas × 6.00 m = 60.00 m (63.00 m²)');
+    const firstCustomer = db.prepare('SELECT id FROM customers LIMIT 1').get() as { id: number } | undefined;
+    const camisaProd = db.prepare("SELECT id, price FROM products WHERE barcode = '51-09415-000'").get() as { id: number; price: number } | undefined;
+    const anillaProd = db.prepare("SELECT id, price FROM products WHERE barcode = '4948'").get() as { id: number; price: number } | undefined;
+    if (camisaProd && anillaProd) {
+      const totalQ = Number((camisaProd.price * 4 + anillaProd.price * 4).toFixed(2));
+      const qRes = db.prepare('INSERT INTO quotations (user_id, customer_id, total, valid_until, notes, status) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(adminUser.id, firstCustomer ? firstCustomer.id : null, totalQ, new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], 'Proforma overhaul motor tractor Fiat / Perkins 1104', 'PENDING');
+      db.prepare('INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
+        .run(qRes.lastInsertRowid, camisaProd.id, 4, camisaProd.price, Number((camisaProd.price * 4).toFixed(2)));
+      db.prepare('INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)')
+        .run(qRes.lastInsertRowid, anillaProd.id, 4, anillaProd.price, Number((anillaProd.price * 4).toFixed(2)));
+    }
   }
 };
 seed();
@@ -971,23 +749,23 @@ async function startServer() {
   app.post('/api/products', authenticateToken, isAdmin, (req: any, res) => {
     const {
       name, description, price, cost_price, stock, min_stock, branch_stocks,
-      category, barcode, batch_number, expiry_date, is_combo, combo_items,
-      image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type
+      category, brand, oem_codes, supplier_name, barcode, batch_number, expiry_date,
+      is_combo, combo_items, unit_type
     } = req.body;
-    console.log('Creating product:', { name, price, stock, category });
+    console.log('Creating tractor part:', { name, price, stock, category, brand });
     try {
       const costVal = cost_price !== undefined ? Number(cost_price) : Number((Number(price) * 0.65).toFixed(2));
       const minStockVal = min_stock !== undefined && min_stock !== null && min_stock !== '' ? Math.max(0, Number(min_stock)) : 0;
       const stockVal = Number(Number(stock || 0).toFixed(2));
-      const branchStocksVal = branch_stocks ? (typeof branch_stocks === 'string' ? branch_stocks : JSON.stringify(branch_stocks)) : JSON.stringify({ 'Sucursal Central': stockVal, 'Sucursal Norte': 0 });
+      const branchStocksVal = branch_stocks ? (typeof branch_stocks === 'string' ? branch_stocks : JSON.stringify(branch_stocks)) : JSON.stringify({ 'Sucursal Central': stockVal, 'Sucursal Norte': 0, 'Sucursal Sur': 0 });
+      const supplierVal = supplier_name || batch_number || 'GENERAL';
 
       const result = db.prepare(`
         INSERT INTO products (
           name, description, price, cost_price, stock, min_stock, branch_stocks, category,
-          barcode, batch_number, expiry_date, is_combo, combo_items,
-          image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type
+          brand, oem_codes, supplier_name, barcode, batch_number, expiry_date, is_combo, combo_items, unit_type
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         name,
         description || null,
@@ -996,26 +774,22 @@ async function startServer() {
         stockVal,
         minStockVal,
         branchStocksVal,
-        category || 'Calamina Ondulada',
-        barcode || `CAL-${Math.floor(100000 + Math.random() * 900000)}`,
-        batch_number || null,
-        expiry_date || null,
+        category || 'MOTOR',
+        brand || 'GENERAL',
+        oem_codes || '',
+        supplierVal,
+        barcode || `REP-${Math.floor(1000 + Math.random() * 9000)}`,
+        supplierVal,
+        expiry_date || '2030-12-31',
         is_combo ? 1 : 0,
         combo_items ? (typeof combo_items === 'string' ? combo_items : JSON.stringify(combo_items)) : null,
-        image_url || '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
-        design_type || 'Ondulada Sinusoidal',
-        color_name || 'Zinc Galvanizado',
-        color_hex || '#94a3b8',
-        thickness || '0.35 mm',
-        width_m ? Number(width_m) : 0.85,
-        standard_length_m ? Number(standard_length_m) : 3.0,
-        unit_type || 'm'
+        unit_type || 'UNIDAD'
       );
       
       db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(result.lastInsertRowid, req.user.id, 'IN', stockVal, 'Stock inicial (metros lineales)');
+        .run(result.lastInsertRowid, req.user.id, 'IN', stockVal, 'Stock inicial repuesto');
       
-      logAudit(req.user.id, 'CREATE', 'PRODUCT', Number(result.lastInsertRowid), `Producto creado: ${name}`);
+      logAudit(req.user.id, 'CREATE', 'PRODUCT', Number(result.lastInsertRowid), `Repuesto creado: ${name}`);
       res.json({ id: result.lastInsertRowid });
     } catch (error: any) {
       console.error('Error creating product:', error);
@@ -1026,53 +800,50 @@ async function startServer() {
   app.put('/api/products/:id', authenticateToken, isAdmin, (req: any, res) => {
     const {
       name, description, price, cost_price, stock, min_stock, branch_stocks,
-      category, barcode, batch_number, expiry_date, is_combo, combo_items,
-      image_url, design_type, color_name, color_hex, thickness, width_m, standard_length_m, unit_type
+      category, brand, oem_codes, supplier_name, barcode, batch_number, expiry_date,
+      is_combo, combo_items, unit_type
     } = req.body;
     const oldProduct = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id) as any;
     const costVal = cost_price !== undefined ? Number(cost_price) : (oldProduct?.cost_price || Number((Number(price) * 0.65).toFixed(2)));
     const minStockVal = min_stock !== undefined && min_stock !== null && min_stock !== '' ? Math.max(0, Number(min_stock)) : (oldProduct?.min_stock ?? 0);
     const stockVal = Number(Number(stock ?? oldProduct?.stock ?? 0).toFixed(2));
-    const branchStocksVal = branch_stocks ? (typeof branch_stocks === 'string' ? branch_stocks : JSON.stringify(branch_stocks)) : (oldProduct?.branch_stocks || JSON.stringify({ 'Sucursal Central': stockVal, 'Sucursal Norte': 0 }));
+    const branchStocksVal = branch_stocks ? (typeof branch_stocks === 'string' ? branch_stocks : JSON.stringify(branch_stocks)) : (oldProduct?.branch_stocks || JSON.stringify({ 'Sucursal Central': stockVal, 'Sucursal Norte': 0, 'Sucursal Sur': 0 }));
+    const supplierVal = supplier_name ?? oldProduct?.supplier_name ?? batch_number ?? oldProduct?.batch_number ?? 'GENERAL';
     
     db.prepare(`
       UPDATE products
       SET name = ?, description = ?, price = ?, cost_price = ?, stock = ?, min_stock = ?, branch_stocks = ?,
-          category = ?, barcode = ?, batch_number = ?, expiry_date = ?, is_combo = ?, combo_items = ?,
-          image_url = ?, design_type = ?, color_name = ?, color_hex = ?, thickness = ?, width_m = ?, standard_length_m = ?, unit_type = ?
+          category = ?, brand = ?, oem_codes = ?, supplier_name = ?, barcode = ?, batch_number = ?, expiry_date = ?,
+          is_combo = ?, combo_items = ?, unit_type = ?
       WHERE id = ?
     `).run(
       name,
-      description,
+      description || null,
       price,
       costVal,
       stockVal,
       minStockVal,
       branchStocksVal,
       category,
-      barcode || null,
-      batch_number || null,
-      expiry_date || null,
+      brand ?? oldProduct?.brand ?? 'GENERAL',
+      oem_codes ?? oldProduct?.oem_codes ?? '',
+      supplierVal,
+      barcode || oldProduct?.barcode || null,
+      supplierVal,
+      expiry_date || oldProduct?.expiry_date || '2030-12-31',
       is_combo ? 1 : 0,
       combo_items ? (typeof combo_items === 'string' ? combo_items : JSON.stringify(combo_items)) : null,
-      image_url ?? oldProduct?.image_url ?? '/src/assets/images/calamina_zinc_ondulada_1795139681242.jpg',
-      design_type ?? oldProduct?.design_type ?? 'Ondulada Sinusoidal',
-      color_name ?? oldProduct?.color_name ?? 'Zinc Galvanizado',
-      color_hex ?? oldProduct?.color_hex ?? '#94a3b8',
-      thickness ?? oldProduct?.thickness ?? '0.35 mm',
-      width_m !== undefined ? Number(width_m) : (oldProduct?.width_m ?? 0.85),
-      standard_length_m !== undefined ? Number(standard_length_m) : (oldProduct?.standard_length_m ?? 3.0),
-      unit_type ?? oldProduct?.unit_type ?? 'm',
+      unit_type ?? oldProduct?.unit_type ?? 'UNIDAD',
       req.params.id
     );
     
     if (oldProduct && oldProduct.stock !== stockVal) {
       const diff = Number((stockVal - oldProduct.stock).toFixed(2));
       db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(req.params.id, req.user.id, diff > 0 ? 'IN' : 'OUT', Math.abs(diff), 'Ajuste manual de metraje');
+        .run(req.params.id, req.user.id, diff > 0 ? 'IN' : 'OUT', Math.abs(diff), 'Ajuste manual de stock');
     }
 
-    logAudit(req.user.id, 'UPDATE', 'PRODUCT', Number(req.params.id), `Producto actualizado: ${name}`);
+    logAudit(req.user.id, 'UPDATE', 'PRODUCT', Number(req.params.id), `Repuesto actualizado: ${name}`);
     res.json({ success: true });
   });
 
@@ -1315,8 +1086,8 @@ async function startServer() {
       }
 
       const available = Number(branches[from_branch] || 0);
-      if (available + 0.001 < qty) {
-        throw new Error(`Metraje insuficiente en ${from_branch}. Disponible actual: ${available} m.`);
+      if (available < qty) {
+        throw new Error(`Stock insuficiente en ${from_branch}. Disponible actual: ${available} uds.`);
       }
 
       branches[from_branch] = Number((available - qty).toFixed(2));
@@ -1331,14 +1102,14 @@ async function startServer() {
       `).run(product_id, from_branch, to_branch, qty, notes || null, req.user.id);
 
       db.prepare('INSERT INTO inventory_movements (product_id, user_id, type, quantity, reason) VALUES (?, ?, ?, ?, ?)')
-        .run(product_id, req.user.id, 'ADJUSTMENT', qty, `Traspaso entre sucursales: ${qty} m de [${from_branch}] a [${to_branch}]${notes ? ` (${notes})` : ''}`);
+        .run(product_id, req.user.id, 'ADJUSTMENT', qty, `Traspaso entre sucursales: ${qty} uds de [${from_branch}] a [${to_branch}]${notes ? ` (${notes})` : ''}`);
 
       return { transferId: result.lastInsertRowid, branches };
     });
 
     try {
       const { transferId, branches } = transaction();
-      logAudit(req.user.id, 'TRANSFER', 'BRANCH_TRANSFER', Number(transferId), `Traspaso de ${qty} m de ${from_branch} a ${to_branch}`);
+      logAudit(req.user.id, 'TRANSFER', 'BRANCH_TRANSFER', Number(transferId), `Traspaso de ${qty} uds de ${from_branch} a ${to_branch}`);
       res.json({ success: true, transferId, updated_stocks: branches });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
@@ -1827,7 +1598,7 @@ async function startServer() {
   // AI Context Endpoint
   app.get('/api/ai/context', authenticateToken, (req: any, res) => {
     try {
-      const products = db.prepare('SELECT name, stock, price, category FROM products WHERE active = 1').all();
+      const products = db.prepare('SELECT barcode, name, brand, category, supplier_name, stock, min_stock, price, unit_type FROM products WHERE active = 1').all();
       const users = db.prepare('SELECT username, full_name, r.name as role FROM users JOIN roles r ON users.role_id = r.id').all();
       const salesSummary = db.prepare(`
         SELECT u.full_name as seller, COUNT(s.id) as total_sales, SUM(s.total) as total_revenue
@@ -1959,8 +1730,8 @@ async function startServer() {
       const lowStock = db.prepare(`
         SELECT COUNT(*) as count FROM products 
         WHERE active = 1 AND (
-          (COALESCE(min_stock, 5) > 0 AND stock <= COALESCE(min_stock, 5))
-          OR (COALESCE(min_stock, 5) = 0 AND stock < 0)
+          (COALESCE(min_stock, 0) > 0 AND stock <= COALESCE(min_stock, 0))
+          OR (COALESCE(min_stock, 0) = 0 AND stock < 0)
         )
       `).get() as any;
       const customersCount = db.prepare('SELECT COUNT(*) as count FROM customers').get() as any;
@@ -2070,7 +1841,7 @@ async function startServer() {
 
   const PORT = isDev ? 3000 : (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
   app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n🚀 ¡Servidor AcerTecho Pro (Calaminas por Medición) iniciado con éxito!');
+    console.log('\n🚀 ¡Servidor AgroPartes Pro (Repuestos de Tractores) iniciado con éxito!');
     console.log(`🏠 Local:    http://localhost:${PORT}`);
     console.log(`🌐 Red:     http://0.0.0.0:${PORT}\n`);
   });
