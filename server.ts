@@ -2068,7 +2068,7 @@ async function startServer() {
     });
   }
 
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+  const PORT = isDev ? 3000 : (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
   app.listen(PORT, '0.0.0.0', () => {
     console.log('\n🚀 ¡Servidor AcerTecho Pro (Calaminas por Medición) iniciado con éxito!');
     console.log(`🏠 Local:    http://localhost:${PORT}`);
