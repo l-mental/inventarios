@@ -21,12 +21,15 @@ import {
   Database,
   Truck,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  Download,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AIChat from './AIChat';
 import SalesFloatingWidget from './SalesFloatingWidget';
 import { useTheme } from '../context/ThemeContext';
+import { downloadLaravelZip } from '../lib/downloadLaravel';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -42,7 +45,8 @@ export default function Layout() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Tablero Principal', icon: LayoutDashboard, roles: ['Admin', 'Vendedor'] },
-    { id: 'pos', label: 'Cotizar / POS Mostrador', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
+    { id: 'pos', label: 'POS Mostrador', icon: ShoppingCart, roles: ['Admin', 'Vendedor'] },
+    { id: 'quotations', label: 'Cotizaciones PDF', icon: FileText, roles: ['Admin', 'Vendedor'] },
     { id: 'purchases', label: 'Compras Proveedores', icon: Truck, roles: ['Admin', 'Vendedor'] },
     { 
       id: 'inventario-group', 
@@ -238,6 +242,16 @@ export default function Layout() {
             {(showSystemInfo) && <div className="h-10 w-[1px] bg-slate-200 dark:border-slate-800 hidden md:block" />}
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { downloadLaravelZip().catch(console.error); }}
+                className="px-3 py-2.5 rounded-lg bg-brand/10 hover:bg-brand/20 border border-brand/25 text-brand text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95"
+                title="Descargar Proyecto Completo en Laravel 11 (.zip)"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Laravel (.zip)</span>
+              </button>
+
               <button
                 onClick={() => setShowSystemInfo(!showSystemInfo)}
                 className={`p-2.5 rounded-lg transition-all border shadow-sm flex items-center justify-center active:scale-95 group ${

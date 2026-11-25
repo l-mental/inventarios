@@ -137,19 +137,33 @@ function createInitialStore(): LocalStore {
   const quotations: Quotation[] = [
     {
       id: 1,
+      quote_number: '11001',
       user_id: 1,
       customer_id: 1,
       seller_name: 'Administrador Sistema',
       customer_name: 'Estancia Agrícola El Porvenir',
+      customer_code: '645',
+      customer_nit: '4076592',
       customer_phone: '78945612',
+      customer_city: 'SANTA CRUZ / BOLIVIA',
+      customer_email: 'administracion@elporvenir.bo',
+      exchange_rate: 6.96,
+      currency_mode: 'USD_TO_BS',
+      tractor_model: 'PERKINS 1104 / FIAT',
+      sale_condition: 'Stock',
+      validity_label: '7 días',
+      observations: 'PROFORMA OVERHAUL MOTOR TRACTOR FIAT / PERKINS 1104',
+      subtotal: Number(((pCamisa?.price || 65) * 4 + (pAnilla?.price || 18.68) * 4).toFixed(2)),
+      discount_amount: 0,
+      paid_amount: 0,
       total: Number(((pCamisa?.price || 65) * 4 + (pAnilla?.price || 18.68) * 4).toFixed(2)),
       valid_until: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
       notes: 'Proforma overhaul motor tractor Fiat / Perkins 1104',
       status: 'PENDING',
       created_at: nowIso,
       details: [
-        { id: 1, sale_id: 1, product_id: pCamisa?.id || 34, product_name: pCamisa?.name || 'CAMISA HUMEDA 115MM X 225MM NORMAL/TURBO', quantity: 4, unit_price: pCamisa?.price || 65, subtotal: Number(((pCamisa?.price || 65) * 4).toFixed(2)) },
-        { id: 2, sale_id: 1, product_id: pAnilla?.id || 90, product_name: pAnilla?.name || 'JGO. DE ANILLA 105MM STD 2.7X2.5X3.00 PERKINS 1104', quantity: 4, unit_price: pAnilla?.price || 18.68, subtotal: Number(((pAnilla?.price || 18.68) * 4).toFixed(2)) }
+        { id: 1, sale_id: 1, product_id: pCamisa?.id || 34, product_code: pCamisa?.barcode || '34', product_name: pCamisa?.name || 'CAMISA HUMEDA 115MM X 225MM NORMAL/TURBO', quantity: 4, unit_price: pCamisa?.price || 65, subtotal: Number(((pCamisa?.price || 65) * 4).toFixed(2)) },
+        { id: 2, sale_id: 1, product_id: pAnilla?.id || 90, product_code: pAnilla?.barcode || '4948', product_name: pAnilla?.name || 'JGO. DE ANILLA 105MM STD 2.7X2.5X3.00 PERKINS 1104', quantity: 4, unit_price: pAnilla?.price || 18.68, subtotal: Number(((pAnilla?.price || 18.68) * 4).toFixed(2)) }
       ]
     }
   ];
@@ -190,7 +204,9 @@ function createInitialStore(): LocalStore {
       currency: 'Bs',
       phone: '77889900',
       address: 'Av. Agrícola Km 4, Zona Talleres Maquinaria Pesada',
-      tax_percentage: '13'
+      tax_percentage: '13',
+      exchange_rate: '6.96',
+      company_website: 'www.agropartestractores.com'
     }
   };
 }
@@ -204,6 +220,9 @@ export function getStore(): LocalStore {
         if (!Array.isArray(parsed.branch_transfers)) {
           parsed.branch_transfers = [];
         }
+        if (!parsed.settings) parsed.settings = {};
+        if (!parsed.settings.exchange_rate) parsed.settings.exchange_rate = '6.96';
+        if (!parsed.settings.company_website) parsed.settings.company_website = 'www.agropartestractores.com';
         parsed.products.forEach((p: any) => {
           if (p.min_stock === undefined || p.min_stock === null) p.min_stock = 0;
           if (!p.branch_stocks) {
@@ -912,35 +931,51 @@ export async function handleLocalApiRequest(url: string, options: RequestInit = 
   if (path === '/api/quotations' && method === 'POST') {
     const nextId = store.quotations.reduce((m, q) => Math.max(m, q.id), 0) + 1;
     const cust = store.customers.find(c => c.id === Number(body.customer_id));
+    const quoteNumber = body.quote_number || String(11000 + nextId);
     const details = (body.items || []).map((item: any, idx: number) => {
       const prod = store.products.find(p => p.id === Number(item.id));
       return {
         id: idx + 1,
         sale_id: nextId,
         product_id: Number(item.id),
-        product_name: prod?.name || 'Producto',
+        product_code: item.code || prod?.barcode || String(item.id),
+        product_name: item.name || prod?.name || 'Repuesto',
         quantity: Number(item.quantity),
         unit_price: Number(item.price),
-        subtotal: Number(item.quantity) * Number(item.price)
+        subtotal: Number((Number(item.quantity) * Number(item.price)).toFixed(2))
       };
     });
     const newQ: Quotation = {
       id: nextId,
+      quote_number: quoteNumber,
       user_id: currentUser.id,
       customer_id: cust?.id,
       seller_name: currentUser.full_name,
-      customer_name: cust?.name,
-      customer_phone: cust?.phone,
+      customer_name: body.customer_name || cust?.name || 'CLIENTE GENERAL',
+      customer_code: body.customer_code || (cust ? String(cust.id) : 'S/N'),
+      customer_nit: body.customer_nit || 'S/N',
+      customer_phone: body.customer_phone || cust?.phone || '',
+      customer_city: body.customer_city || cust?.address || 'SANTA CRUZ / BOLIVIA',
+      customer_email: body.customer_email || cust?.email || 'S/N',
+      exchange_rate: Number(body.exchange_rate || store.settings?.exchange_rate || 6.96),
+      currency_mode: body.currency_mode || 'USD_TO_BS',
+      tractor_model: body.tractor_model || 'REPUESTOS',
+      sale_condition: body.sale_condition || 'Stock',
+      validity_label: body.validity_label || '7 días',
+      observations: body.observations || '',
+      subtotal: Number(body.subtotal ?? body.total ?? 0),
+      discount_amount: Number(body.discount_amount || 0),
+      paid_amount: Number(body.paid_amount || 0),
       total: Number(body.total || 0),
       valid_until: body.valid_until || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-      notes: body.notes || 'Cotización válida por 7 días',
+      notes: body.notes || body.observations || 'Cotización válida según fecha indicada',
       status: 'PENDING',
       created_at: nowIso,
       details
     };
     store.quotations.unshift(newQ);
     saveStore(store);
-    return { id: nextId };
+    return { id: nextId, quote_number: quoteNumber };
   }
   if (path.startsWith('/api/quotations/') && path.endsWith('/convert') && method === 'POST') {
     const parts = path.split('/');

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { handleLocalAuthLogin, isStaticHostEnvironment } from '../lib/localApi';
-import { Loader2, ArrowRight, Wrench, Layers, ShieldCheck, Cog } from 'lucide-react';
+import { downloadLaravelZip } from '../lib/downloadLaravel';
+import { Loader2, ArrowRight, Wrench, Layers, ShieldCheck, Cog, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function LoginPage() {
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [downloadingLaravel, setDownloadingLaravel] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -216,8 +218,27 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-10 text-center border-t border-slate-100 dark:border-slate-800 pt-6">
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.25em]">
+          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
+            <button
+              type="button"
+              disabled={downloadingLaravel}
+              onClick={async () => {
+                setDownloadingLaravel(true);
+                try {
+                  await downloadLaravelZip();
+                } catch (e: any) {
+                  setError(e.message || 'No se pudo descargar el archivo ZIP.');
+                } finally {
+                  setDownloadingLaravel(false);
+                }
+              }}
+              className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all border border-slate-700"
+            >
+              {downloadingLaravel ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-orange-400" />}
+              {downloadingLaravel ? 'Descargando Laravel...' : 'Descargar Proyecto Completo Laravel 11 (.zip)'}
+            </button>
+
+            <p className="text-center text-[10px] text-slate-400 font-black uppercase tracking-[0.25em]">
               AgroPartes Tractores S.R.L. · <span className="text-brand">Repuestos Agrícolas &amp; OEM</span>
             </p>
           </div>

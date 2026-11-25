@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useApi } from '../hooks/useApi';
 import { Customer, Product, CashSession, Quotation } from '../types';
+import PosQuotationModal from '../components/PosQuotationModal';
 import {
   TRACTOR_CATEGORIES,
   TRACTOR_BRANDS,
@@ -77,6 +79,7 @@ export default function POS() {
   // Quotations (Proformas)
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [showQuotationsModal, setShowQuotationsModal] = useState(false);
+  const [showPosQuotationModal, setShowPosQuotationModal] = useState(false);
   const [activeQuotationId, setActiveQuotationId] = useState<number | null>(null);
 
   // Post-Sale WhatsApp / Receipt Modal
@@ -97,6 +100,8 @@ export default function POS() {
 
   const { token, user } = useAuth();
   const { apiFetch } = useApi();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const isAdmin = user?.role === 'Admin';
 
@@ -126,6 +131,14 @@ export default function POS() {
   useEffect(() => {
     fetchAllData();
   }, [token]);
+
+  useEffect(() => {
+    const state = location.state as { loadQuotation?: Quotation } | null;
+    if (state?.loadQuotation && products.length > 0) {
+      loadQuotationIntoCart(state.loadQuotation);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, products]);
 
   useEffect(() => {
     if (message) {
@@ -305,56 +318,16 @@ export default function POS() {
     }
   };
 
-  const handleSaveQuotation = async () => {
-    if (cart.length === 0) return;
-    setLoading(true);
-    try {
-      const validUntil = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-      const res = await apiFetch('/api/quotations', {
-        method: 'POST',
-        body: JSON.stringify({
-          customer_id: selectedCustomerId,
-          items: cart.map(i => ({
-            id: i.product.id,
-            quantity: i.quantity,
-            price: i.product.price,
-            measurement_summary: `${i.quantity} ${i.product.unit_type || 'UNIDAD'}`,
-          })),
-          total,
-          valid_until: validUntil,
-          notes: `Proforma de repuestos (${totalCartUnits} unidades)`,
-        }),
-      });
-
-      const custName = selectedCustomer ? selectedCustomer.name : 'Cliente General';
-      const custPhone = selectedCustomer?.phone || '';
-      setWhatsappPhone(custPhone);
-      setLastReceipt({
-        id: res.id,
-        type: 'PROFORMA',
-        customerName: custName,
-        phone: custPhone,
-        items: cart.map(i => ({
-          name: i.product.name,
-          code: i.product.barcode || String(i.product.id),
-          unit: i.product.unit_type || 'UNIDAD',
-          quantity: i.quantity,
-          price: i.product.price,
-        })),
-        subtotal,
-        discount: discountAmount,
-        total,
-        paymentMethod: 'PROFORMA REPUESTOS (VÁLIDA 7 DÍAS)',
-      });
-
-      setCart([]);
-      fetchAllData();
-      setMessage({ type: 'success', text: `Proforma #PRO-${res.id} guardada sin descontar stock.` });
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message });
-    } finally {
-      setLoading(false);
-    }
+  const handleOpenQuotationWindow = () => {
+    navigate('/quotations', {
+      state:
+        cart.length > 0
+          ? {
+              fromPosCart: cart.map(c => ({ product: c.product, quantity: c.quantity })),
+              customerId: selectedCustomerId,
+            }
+          : undefined,
+    });
   };
 
   const loadQuotationIntoCart = (q: Quotation) => {
@@ -526,11 +499,11 @@ export default function POS() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowQuotationsModal(true)}
-            className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap"
+            onClick={handleOpenQuotationWindow}
+            className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand hover:text-white text-slate-700 dark:text-slate-200 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap"
           >
-            <FileText className="w-4 h-4 text-brand" />
-            Proformas ({quotations.filter(q => q.status === 'PENDING').length})
+            <FileText className="w-4 h-4 text-brand group-hover:text-white" />
+            Cotizaciones PDF ({quotations.filter(q => q.status === 'PENDING').length})
           </button>
 
           <button
@@ -698,13 +671,13 @@ export default function POS() {
             </div>
             {cart.length > 0 && (
               <button
-                onClick={handleSaveQuotation}
+                onClick={() => setShowPosQuotationModal(true)}
                 disabled={loading}
                 className="px-3 py-2 bg-slate-200/80 dark:bg-slate-800 hover:bg-brand hover:text-white text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
-                title="Guardar como Proforma sin descontar stock"
+                title="Abrir Cotización PDF con Tipo de Cambio en POS Mostrador"
               >
                 <FileText className="w-3.5 h-3.5" />
-                Proforma
+                Cotizar PDF
               </button>
             )}
           </div>
@@ -1005,14 +978,26 @@ export default function POS() {
               </div>
             )}
 
-            <button
-              onClick={handleCheckout}
-              disabled={cart.length === 0 || loading}
-              className="w-full py-3.5 bg-brand hover:bg-brand/90 text-white rounded-lg font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-brand/20 transition-all border-b-4 border-brand-muted flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShoppingBag className="w-5 h-5" />}
-              {loading ? 'Procesando...' : 'Confirmar Venta y Facturar'}
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleCheckout}
+                disabled={cart.length === 0 || loading}
+                className="w-full py-3.5 bg-brand hover:bg-brand/90 text-white rounded-lg font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-brand/20 transition-all border-b-4 border-brand-muted flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShoppingBag className="w-5 h-5" />}
+                {loading ? 'Procesando...' : 'Confirmar Venta y Facturar'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPosQuotationModal(true)}
+                disabled={cart.length === 0 || loading}
+                className="w-full py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg font-black uppercase tracking-[0.14em] text-[10px] border border-slate-700 flex items-center justify-center gap-2 transition-all disabled:opacity-45"
+              >
+                <FileText className="w-4 h-4 text-amber-400" />
+                Cotizar en PDF (Tipo de Cambio &amp; WhatsApp)
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1426,6 +1411,28 @@ export default function POS() {
           </div>
         </div>
       )}
+
+      {/* Full POS Mostrador Quotation Modal (Paso 1 Tipo de Cambio -> Paso 2 PDF & WhatsApp PDF) */}
+      <PosQuotationModal
+        isOpen={showPosQuotationModal}
+        onClose={() => setShowPosQuotationModal(false)}
+        cart={cart.map(c => ({ product: c.product, quantity: c.quantity }))}
+        selectedCustomer={selectedCustomer}
+        initialDiscount={discountAmount}
+        nextQuoteNumber={String(
+          quotations.reduce((max, q) => {
+            const n = parseInt(String(q.quote_number || q.id || '0'), 10);
+            return Number.isFinite(n) ? Math.max(max, n) : max;
+          }, 11000) + 1
+        )}
+        onSuccess={quoteNum => {
+          fetchAllData();
+          setMessage({
+            type: 'success',
+            text: `Cotización N° ${quoteNum} guardada y generada en PDF sin descontar stock.`,
+          });
+        }}
+      />
     </div>
   );
 }

@@ -47,6 +47,8 @@ const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   phone: '77889900',
   address: 'Av. Agrícola Km 4, Zona Talleres Maquinaria Pesada',
   tax_percentage: '13',
+  exchange_rate: '6.96',
+  company_website: 'www.agropartestractores.com',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

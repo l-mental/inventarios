@@ -172,11 +172,25 @@ export interface CashSession {
 
 export interface Quotation {
   id: number;
+  quote_number?: string;
   user_id: number;
   customer_id?: number;
   seller_name?: string;
   customer_name?: string;
+  customer_code?: string;
+  customer_nit?: string;
   customer_phone?: string;
+  customer_city?: string;
+  customer_email?: string;
+  exchange_rate?: number;
+  currency_mode?: 'USD_TO_BS' | 'BS_SCALED' | 'BS_DIRECT';
+  tractor_model?: string;
+  sale_condition?: string;
+  validity_label?: string;
+  observations?: string;
+  subtotal?: number;
+  discount_amount?: number;
+  paid_amount?: number;
   total: number;
   valid_until: string;
   notes?: string;
@@ -250,6 +264,7 @@ export interface SaleDetail {
   sale_id: number;
   product_id: number;
   product_name: string;
+  product_code?: string;
   quantity: number;
   unit_price: number;
   subtotal: number;

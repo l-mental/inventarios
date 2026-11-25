@@ -1,0 +1,3 @@
+<?php
+
+// Laravel console routes

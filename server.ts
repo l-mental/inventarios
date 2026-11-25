@@ -194,6 +194,23 @@ try { db.exec("ALTER TABLE quotation_details ADD COLUMN sheet_length_m REAL"); }
 try { db.exec("ALTER TABLE quotation_details ADD COLUMN sheet_count REAL"); } catch (e) {}
 try { db.exec("ALTER TABLE quotation_details ADD COLUMN measurement_summary TEXT"); } catch (e) {}
 
+try { db.exec("ALTER TABLE quotations ADD COLUMN quote_number TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN exchange_rate REAL DEFAULT 6.96"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN currency_mode TEXT DEFAULT 'USD_TO_BS'"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN tractor_model TEXT DEFAULT 'REPUESTOS'"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN sale_condition TEXT DEFAULT 'Stock'"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN validity_label TEXT DEFAULT '7 días'"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN observations TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN subtotal REAL DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN discount_amount REAL DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN paid_amount REAL DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN customer_name TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN customer_code TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN customer_nit TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN customer_phone TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN customer_city TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE quotations ADD COLUMN customer_email TEXT"); } catch (e) {}
+
 try { db.exec("ALTER TABLE sales ADD COLUMN cancel_reason TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE sales ADD COLUMN cancelled_at DATETIME"); } catch (e) {}
 try { db.exec("ALTER TABLE sales ADD COLUMN cancelled_by TEXT"); } catch (e) {}
@@ -429,13 +446,17 @@ const seed = () => {
       ['currency', 'Bs'],
       ['phone', '77889900'],
       ['address', 'Av. Agrícola Km 4, Zona Talleres Maquinaria Pesada'],
-      ['tax_percentage', '13']
+      ['tax_percentage', '13'],
+      ['exchange_rate', '6.96'],
+      ['company_website', 'www.agropartestractores.com']
     ];
     const insertSetting = db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)');
     defaultSettings.forEach(([key, value]) => {
       insertSetting.run(key, value);
     });
   }
+  db.prepare('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)').run('exchange_rate', '6.96');
+  db.prepare('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)').run('company_website', 'www.agropartestractores.com');
 
   // Seed Initial Sales if empty
   const salesCount = db.prepare('SELECT count(*) as count FROM sales').get() as { count: number };
@@ -527,6 +548,14 @@ async function startServer() {
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
+  });
+
+  app.get('/downloads/agropartes-laravel.zip', (req, res) => {
+    const zipPath = path.resolve(process.cwd(), 'public', 'downloads', 'agropartes-laravel.zip');
+    if (!fs.existsSync(zipPath)) {
+      return res.status(404).json({ error: 'Archivo Laravel ZIP no encontrado' });
+    }
+    res.download(zipPath, 'agropartes-laravel.zip');
   });
 
   app.get('/api/health', (req, res) => {
@@ -1278,7 +1307,12 @@ async function startServer() {
   app.get('/api/quotations', authenticateToken, (req, res) => {
     try {
       const quotations = db.prepare(`
-        SELECT q.*, u.full_name as seller_name, c.name as customer_name, c.phone as customer_phone
+        SELECT q.*,
+               u.full_name as seller_name,
+               COALESCE(q.customer_name, c.name) as customer_name,
+               COALESCE(q.customer_phone, c.phone) as customer_phone,
+               COALESCE(q.customer_city, c.address) as customer_city,
+               COALESCE(q.customer_email, c.email) as customer_email
         FROM quotations q
         JOIN users u ON q.user_id = u.id
         LEFT JOIN customers c ON q.customer_id = c.id
@@ -1287,7 +1321,7 @@ async function startServer() {
 
       const withDetails = quotations.map(q => {
         const details = db.prepare(`
-          SELECT qd.*, p.name as product_name
+          SELECT qd.*, p.name as product_name, p.barcode as product_code
           FROM quotation_details qd
           JOIN products p ON qd.product_id = p.id
           WHERE qd.quotation_id = ?
@@ -1302,17 +1336,74 @@ async function startServer() {
   });
 
   app.post('/api/quotations', authenticateToken, (req: any, res) => {
-    const { customer_id, items, total, valid_until, notes } = req.body;
+    const {
+      customer_id,
+      customer_name,
+      customer_code,
+      customer_nit,
+      customer_phone,
+      customer_city,
+      customer_email,
+      quote_number,
+      exchange_rate,
+      currency_mode,
+      tractor_model,
+      sale_condition,
+      validity_label,
+      observations,
+      subtotal,
+      discount_amount,
+      paid_amount,
+      items,
+      total,
+      valid_until,
+      notes,
+    } = req.body;
     const transaction = db.transaction(() => {
       const validDate = valid_until || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
       const resQ = db.prepare(`
-        INSERT INTO quotations (user_id, customer_id, total, valid_until, notes, status)
-        VALUES (?, ?, ?, ?, ?, 'PENDING')
-      `).run(req.user.id, customer_id || null, total, validDate, notes || 'Cotización válida por 7 días');
+        INSERT INTO quotations (
+          user_id, customer_id, quote_number, exchange_rate, currency_mode,
+          tractor_model, sale_condition, validity_label, observations,
+          subtotal, discount_amount, paid_amount,
+          customer_name, customer_code, customer_nit, customer_phone, customer_city, customer_email,
+          total, valid_until, notes, status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+      `).run(
+        req.user.id,
+        customer_id || null,
+        quote_number || null,
+        Number(exchange_rate || 6.96),
+        currency_mode || 'USD_TO_BS',
+        tractor_model || 'REPUESTOS',
+        sale_condition || 'Stock',
+        validity_label || '7 días',
+        observations || '',
+        Number(subtotal ?? total ?? 0),
+        Number(discount_amount || 0),
+        Number(paid_amount || 0),
+        customer_name || null,
+        customer_code || null,
+        customer_nit || null,
+        customer_phone || null,
+        customer_city || null,
+        customer_email || null,
+        Number(total || 0),
+        validDate,
+        notes || observations || 'Cotización válida según fecha indicada'
+      );
       const quotationId = resQ.lastInsertRowid;
+      if (!quote_number) {
+        db.prepare('UPDATE quotations SET quote_number = ? WHERE id = ?').run(
+          String(11000 + Number(quotationId)),
+          quotationId
+        );
+      }
 
       for (const item of items) {
         const qty = Number(Number(item.quantity || 0).toFixed(2));
+        const unitPrice = Number(item.price || 0);
         db.prepare(`
           INSERT INTO quotation_details (quotation_id, product_id, quantity, unit_price, subtotal, sheet_length_m, sheet_count, measurement_summary)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1320,8 +1411,8 @@ async function startServer() {
           quotationId,
           item.id,
           qty,
-          item.price,
-          Number((qty * item.price).toFixed(2)),
+          unitPrice,
+          Number((qty * unitPrice).toFixed(2)),
           item.sheet_length_m || null,
           item.sheet_count || null,
           item.measurement_summary || null
@@ -1332,8 +1423,8 @@ async function startServer() {
 
     try {
       const id = transaction();
-      logAudit(req.user.id, 'CREATE', 'QUOTATION', Number(id), `Cotización creada por total: ${total}`);
-      res.json({ id });
+      logAudit(req.user.id, 'CREATE', 'QUOTATION', Number(id), `Cotización creada por total: ${total} (TC: ${exchange_rate || 6.96})`);
+      res.json({ id, quote_number: quote_number || String(11000 + Number(id)) });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -1548,11 +1639,14 @@ async function startServer() {
     res.json(settingsMap);
   });
 
-  app.post('/api/settings', authenticateToken, isAdmin, (req: any, res) => {
+  app.post('/api/settings', authenticateToken, (req: any, res) => {
     try {
       const { key, value } = req.body;
-      db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run(key, value);
-      logAudit(req.user.id, 'UPDATE', 'SETTINGS', null, `Configuración actualizada: ${key}`);
+      if (key !== 'exchange_rate' && req.user.role !== 'Admin') {
+        return res.status(403).json({ error: 'Acceso denegado: Se requiere rol de Administrador' });
+      }
+      db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run(key, String(value));
+      logAudit(req.user.id, 'UPDATE', 'SETTINGS', null, `Configuración actualizada: ${key} = ${value}`);
       res.json({ success: true });
     } catch (error: any) {
       console.error('Error updating settings:', error);

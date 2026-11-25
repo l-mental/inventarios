@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
+import Quotations from './pages/Quotations';
 import Products from './pages/Products';
 import SalesHistory from './pages/SalesHistory';
 import Users from './pages/Users';
@@ -89,6 +90,7 @@ function AppRouter() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/pos" element={<ProtectedRoute allowedRoles={['Admin', 'Vendedor']}><POS /></ProtectedRoute>} />
+        <Route path="/quotations" element={<ProtectedRoute allowedRoles={['Admin', 'Vendedor']}><Quotations /></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute allowedRoles={['Admin', 'Vendedor']}><Products /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute allowedRoles={['Admin', 'Vendedor']}><Inventory /></ProtectedRoute>} />
         <Route path="/purchases" element={<ProtectedRoute allowedRoles={['Admin', 'Vendedor']}><Purchases /></ProtectedRoute>} />

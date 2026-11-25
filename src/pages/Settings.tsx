@@ -1,8 +1,9 @@
 import React from 'react';
-import { Settings as SettingsIcon, Globe, Bell, Shield, Database, Save, Coins, QrCode, Upload, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Globe, Bell, Shield, Database, Save, Coins, QrCode, Upload, Trash2, Download } from 'lucide-react';
 import { useSettings, LATAM_CURRENCIES } from '../context/SettingsContext';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
+import { downloadLaravelZip } from '../lib/downloadLaravel';
 
 export default function Settings() {
   const { currency, setCurrency } = useSettings();
@@ -309,6 +310,36 @@ export default function Settings() {
               Limpiar Logs Antiguos
             </button>
           </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="space-y-1">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Código Fuente Laravel 11</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Proyecto PHP/Laravel completo listo para ejecutar en tu PC o servidor.</p>
+        </div>
+        <div className="md:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-white text-sm">AgroPartes Tractores · Laravel 11 + Migraciones + 91 Repuestos</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Incluye modelos Eloquent, controladores REST/Web, seeders, Blade views y guía README.md.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { downloadLaravelZip().catch(console.error); }}
+              className="px-5 py-3 bg-brand hover:bg-brand-muted text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-brand/20"
+            >
+              <Download className="w-4 h-4" />
+              Descargar Laravel (.zip)
+            </button>
+          </div>
+          <pre className="p-3 bg-slate-950 text-slate-200 rounded-xl text-[11px] font-mono overflow-x-auto">
+{`composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate --seed
+php artisan serve`}
+          </pre>
         </div>
       </div>
     </div>
