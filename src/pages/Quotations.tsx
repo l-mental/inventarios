@@ -821,82 +821,82 @@ export default function Quotations() {
         </div>
       ) : step === 'exchange_rate' ? (
         /* STEP 1: MANDATORY EXCHANGE RATE CONFIGURATION BEFORE QUOTING */
-        <div className="max-w-3xl mx-auto">
-          <div className="tech-card p-6 sm:p-8 space-y-6 border-2 border-brand/25">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-brand/10 border border-brand/20 text-brand flex items-center justify-center shrink-0">
-                  <Coins className="w-7 h-7" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand">
-                    Paso 1 · Antes de Cotizar
-                  </span>
-                  <h2 className="text-xl sm:text-2xl font-display font-black uppercase text-slate-900 dark:text-white">
-                    Tipo de Cambio para la Cotización
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Verifica o modifica el tipo de cambio vigente antes de armar tu cotización. Este valor se aplicará a los precios y aparecerá reflejado en el PDF.
-                  </p>
-                </div>
+        <div className="max-w-4xl mx-auto">
+          <div className="tech-card p-4 sm:p-8 space-y-6 border border-slate-200 dark:border-slate-800 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand/10 border border-brand/20 text-brand flex items-center justify-center shrink-0">
+                <Coins className="w-6 h-6 sm:w-7 sm:h-7" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand block">
+                  Paso 1 · Antes de Cotizar
+                </span>
+                <h2 className="text-lg sm:text-2xl font-display font-black uppercase text-slate-900 dark:text-white leading-tight mt-0.5">
+                  Tipo de Cambio para la Cotización
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Verifica o modifica el tipo de cambio vigente antes de armar tu cotización. Este valor se aplicará a los precios y aparecerá reflejado en el PDF.
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                    Tipo de Cambio (1 USD en Bs)
-                  </label>
-                  <span className="text-[10px] font-bold text-slate-400">Base ref: 6.96</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="px-3.5 py-3 rounded-lg bg-slate-900 dark:bg-slate-950 text-white font-mono font-black text-sm">
-                    1 USD =
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+              <div className="lg:col-span-5 min-w-0 p-4 sm:p-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col justify-between gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                      Tipo de Cambio (USD → Bs)
+                    </label>
+                    <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">Ref: 6.96 Bs</span>
                   </div>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.1"
-                    value={exchangeRateInput}
-                    onChange={e => setExchangeRateInput(e.target.value)}
-                    className="flex-1 px-4 py-3 rounded-lg bg-white dark:bg-slate-900 border-2 border-brand/40 focus:border-brand outline-none font-mono font-black text-2xl text-slate-900 dark:text-white text-right tabular-nums"
-                  />
-                  <div className="px-3.5 py-3 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-mono font-black text-sm">
-                    Bs
-                  </div>
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {['6.96', '7.00', '7.50', '8.50', '9.50', '10.50'].map(preset => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setExchangeRateInput(preset)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-black border transition-all ${
-                        Number(exchangeRateInput).toFixed(2) === preset
-                          ? 'bg-brand text-white border-brand shadow-sm'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand/50'
-                      }`}
-                    >
-                      {preset} Bs
-                    </button>
-                  ))}
+                  <div className="flex items-stretch w-full rounded-xl bg-white dark:bg-slate-900 border-2 border-brand/40 focus-within:border-brand overflow-hidden shadow-sm">
+                    <span className="px-3 sm:px-3.5 bg-slate-900 dark:bg-slate-950 text-white font-mono font-black text-xs flex items-center whitespace-nowrap shrink-0">
+                      1 USD =
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.1"
+                      value={exchangeRateInput}
+                      onChange={e => setExchangeRateInput(e.target.value)}
+                      className="w-full min-w-0 flex-1 bg-transparent px-3 py-3 outline-none font-mono font-black text-xl sm:text-2xl text-slate-900 dark:text-white text-right tabular-nums"
+                    />
+                    <span className="px-3 sm:px-3.5 bg-slate-100 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white font-mono font-black text-xs flex items-center whitespace-nowrap shrink-0">
+                      Bs
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {['6.96', '7.00', '7.50', '8.50', '9.50', '10.50'].map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setExchangeRateInput(preset)}
+                        className={`py-2 px-2 rounded-lg text-xs font-mono font-black border transition-all text-center whitespace-nowrap ${
+                          Number(exchangeRateInput).toFixed(2) === preset
+                            ? 'bg-brand text-white border-brand shadow-sm'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand/50'
+                        }`}
+                      >
+                        {preset} Bs
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleSaveDefaultExchangeRate}
                   disabled={savingRate}
-                  className="w-full py-2.5 px-4 rounded-lg bg-slate-200/80 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-200/80 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  {savingRate ? 'Guardando...' : 'Guardar como T.C. Predeterminado del Sistema'}
+                  <Save className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{savingRate ? 'Guardando...' : 'Guardar como T.C. Predeterminado'}</span>
                 </button>
               </div>
 
-              <div className="space-y-3">
+              <div className="lg:col-span-7 min-w-0 flex flex-col justify-between gap-2.5">
                 <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
                   ¿Cómo aplicar este Tipo de Cambio a los repuestos?
                 </label>
@@ -904,52 +904,73 @@ export default function Quotations() {
                 <button
                   type="button"
                   onClick={() => setCurrencyMode('BS_DIRECT')}
-                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all ${
+                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-start gap-3 ${
                     currencyMode === 'BS_DIRECT'
-                      ? 'border-brand bg-brand/5'
+                      ? 'border-brand bg-brand/5 shadow-sm'
                       : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
-                    1. Catálogo ya en Bolivianos (mostrar T.C. en PDF)
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Usa el precio exacto del catálogo en Bs y registra T.C. {exchangeRate.toFixed(2)} Bs en el PDF.
-                  </p>
+                  <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    currencyMode === 'BS_DIRECT' ? 'border-brand bg-brand' : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {currencyMode === 'BS_DIRECT' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
+                      1. Catálogo ya en Bolivianos (mostrar T.C. en PDF)
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Usa el precio exacto del catálogo en Bs y registra T.C. {exchangeRate.toFixed(2)} Bs en el PDF.
+                    </p>
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrencyMode('BS_SCALED')}
-                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all ${
+                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-start gap-3 ${
                     currencyMode === 'BS_SCALED'
-                      ? 'border-brand bg-brand/5'
+                      ? 'border-brand bg-brand/5 shadow-sm'
                       : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
-                    2. Ajustar precios proporcionalmente (vs base 6.96)
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Escala automáticamente los precios según la variación respecto a 6.96 (×{(exchangeRate / BASE_REFERENCE_TC).toFixed(3)}).
-                  </p>
+                  <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    currencyMode === 'BS_SCALED' ? 'border-brand bg-brand' : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {currencyMode === 'BS_SCALED' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
+                      2. Ajustar precios proporcionalmente (vs base 6.96)
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Escala automáticamente los precios según la variación respecto a 6.96 (×{(exchangeRate / BASE_REFERENCE_TC).toFixed(3)}).
+                    </p>
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrencyMode('USD_TO_BS')}
-                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all ${
+                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-start gap-3 ${
                     currencyMode === 'USD_TO_BS'
-                      ? 'border-brand bg-brand/5'
+                      ? 'border-brand bg-brand/5 shadow-sm'
                       : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
-                    3. Multiplicar precio de lista (USD) × {exchangeRate.toFixed(2)} Bs
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Convierte cada precio multiplicándolo directo por {exchangeRate.toFixed(2)} para mostrarlo en Bs.
-                  </p>
+                  <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    currencyMode === 'USD_TO_BS' ? 'border-brand bg-brand' : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {currencyMode === 'USD_TO_BS' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase text-slate-900 dark:text-white">
+                      3. Multiplicar precio de lista (USD) × {exchangeRate.toFixed(2)} Bs
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Convierte cada precio multiplicándolo directo por {exchangeRate.toFixed(2)} para mostrarlo en Bs.
+                    </p>
+                  </div>
                 </button>
               </div>
             </div>
@@ -960,11 +981,11 @@ export default function Quotations() {
               </div>
             )}
 
-            <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setActiveView('history')}
-                className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="w-full sm:w-auto px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 Ver Cotizaciones Guardadas
               </button>
@@ -972,10 +993,10 @@ export default function Quotations() {
               <button
                 type="button"
                 onClick={handleConfirmRateAndContinue}
-                className="px-6 py-3.5 bg-brand hover:bg-brand/90 text-white rounded-xl font-black uppercase tracking-[0.15em] text-xs shadow-lg shadow-brand/25 flex items-center gap-2.5 border-b-4 border-brand-muted active:scale-95 transition-all"
+                className="w-full sm:w-auto px-6 py-3.5 bg-brand hover:bg-brand/90 text-white rounded-xl font-black uppercase tracking-[0.12em] text-xs shadow-lg shadow-brand/25 flex items-center justify-center gap-2.5 border-b-4 border-brand-muted active:scale-95 transition-all"
               >
                 <span>Confirmar T.C. ({exchangeRate.toFixed(2)} Bs) y Realizar Cotización</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 shrink-0" />
               </button>
             </div>
           </div>
@@ -1506,7 +1527,8 @@ export default function Quotations() {
               </div>
 
               {/* A4 / Letter White Document Sheet Preview */}
-              <div className="bg-white text-slate-900 rounded-xl shadow-xl border border-slate-300 p-6 sm:p-8 text-[11px] leading-snug select-text">
+              <div className="overflow-x-auto rounded-xl shadow-xl border border-slate-300 bg-white">
+              <div className="min-w-[540px] sm:min-w-0 bg-white text-slate-900 p-6 sm:p-8 text-[11px] leading-snug select-text">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <div className="flex-1 text-center pt-2">
@@ -1666,6 +1688,7 @@ export default function Quotations() {
                     className="w-full h-auto object-contain"
                   />
                 </div>
+              </div>
               </div>
             </div>
           </div>
